@@ -1,17 +1,14 @@
-import puppeteer, { Browser } from 'puppeteer';
+import "server-only";
+import chromium from "@sparticuz/chromium-min";
+import puppeteer, { Browser } from "puppeteer-core";
 
-let browserInstance: Browser | null = null;
-
-export async function getBrowser(): Promise<Browser> {
-  if (!browserInstance) {
-    browserInstance = await puppeteer.launch({ headless: true });
-  }
-  return browserInstance;
-}
-
-export async function closeBrowser(): Promise<void> {
-  if (browserInstance) {
-    await browserInstance.close();
-    browserInstance = null;
-  }
+export async function launchBrowser(): Promise<Browser> {
+  const executablePath = await chromium.executablePath(
+    process.env.CHROMIUM_REMOTE_EXEC_PATH
+  );
+  return puppeteer.launch({
+    args: chromium.args,
+    executablePath,
+    headless: true,
+  });
 }

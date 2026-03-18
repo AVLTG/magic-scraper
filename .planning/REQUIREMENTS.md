@@ -20,9 +20,9 @@
 
 ### Scrapers
 
-- [ ] **SCRP-01**: LGS scrapers (ETB, DCC, FTF) run on Vercel serverless using `@sparticuz/chromium-min` + `puppeteer-core`
-- [ ] **SCRP-02**: Moxfield collection scraper replaced with plain `fetch()` — no browser needed
-- [ ] **SCRP-03**: LGS scrape results cached per card name with TTL to avoid redundant browser launches on repeated requests
+- [x] **SCRP-01**: LGS scrapers (ETB, DCC, FTF) run on Vercel serverless using `@sparticuz/chromium-min` + `puppeteer-core`
+- [x] **SCRP-02**: Moxfield collection scraper replaced with plain `fetch()` — no browser needed
+- [x] **SCRP-03**: LGS scrape results cached per card name with TTL to avoid redundant browser launches on repeated requests
 - [x] **SCRP-04**: Collection update (`deleteMany` + `createMany`) wrapped in a Prisma transaction to prevent partial data loss
 
 ### Automation
@@ -76,9 +76,9 @@
 | DB-01 | Phase 1 | Complete |
 | DB-02 | Phase 1 | Complete |
 | DB-03 | Phase 1 | Complete |
-| SCRP-01 | Phase 2 | Pending |
-| SCRP-02 | Phase 2 | Pending |
-| SCRP-03 | Phase 2 | Pending |
+| SCRP-01 | Phase 2 | Complete |
+| SCRP-02 | Phase 2 | Complete |
+| SCRP-03 | Phase 2 | Complete |
 | SCRP-04 | Phase 1 (early) | Complete |
 | AUTH-01 | Phase 3 | Pending |
 | AUTH-02 | Phase 3 | Pending |
@@ -98,4 +98,4 @@
 
 ---
 *Requirements defined: 2026-03-16*
-*Last updated: 2026-03-16 after initial definition*
+*Last updated: 2026-03-17 — SCRP-01, SCRP-02 completed in 02-01*

@@ -1,13 +1,12 @@
 import "server-only";
-import puppeteer from 'puppeteer';
 import type { Product, ScrapeCardProps } from "@/types/product";
+import type { Browser } from "puppeteer-core";
 
 
-export async function scrapeETB({ card }: ScrapeCardProps): Promise<Product[]> {
+export async function scrapeETB({ card, browser }: ScrapeCardProps & { browser: Browser }): Promise<Product[]> {
     const cardUrl = card.toLowerCase().replace(/\s+/g, '-');
     const url = `https://enterthebattlefield.ca/search?q=%22${cardUrl}%22`;
 
-    const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
     await page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -88,7 +87,5 @@ export async function scrapeETB({ card }: ScrapeCardProps): Promise<Product[]> {
         return results;
     }, card);
     
-    await browser.close();
-
     return products;
 }

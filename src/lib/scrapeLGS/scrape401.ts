@@ -1,14 +1,13 @@
 import "server-only";
 import type { Product, ScrapeCardProps } from "@/types/product";
-import { getBrowser } from "./browser";
+import type { Browser } from "puppeteer-core";
 
 // DOESNT SEEM TO WORK
 
-export async function scrape401({ card }: ScrapeCardProps): Promise<Product[]> {
+export async function scrape401({ card, browser }: ScrapeCardProps & { browser: Browser }): Promise<Product[]> {
     const cardUrl = card.toLowerCase().replace(/\s+/g, '+');
     const url = `https://store.401games.ca/pages/search-results?q=${cardUrl}&filters=In+Stock,True`;
 
-    const browser = await getBrowser();
     const page = await browser.newPage();
 
     try {

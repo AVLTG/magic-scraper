@@ -13,7 +13,7 @@ The app works locally but can't deploy to Vercel as-is. Four infrastructure chan
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Database Migration** - Replace local SQLite with Turso cloud DB so the app can persist data on Vercel (completed 2026-03-17)
-- [ ] **Phase 2: Serverless Browser Migration** - Swap Puppeteer for serverless-compatible Chromium and replace the Moxfield browser scraper with a plain fetch call
+- [x] **Phase 2: Serverless Browser Migration** - Swap Puppeteer for serverless-compatible Chromium and replace the Moxfield browser scraper with a plain fetch call (completed 2026-03-17)
 - [ ] **Phase 3: Authentication** - Gate all routes behind a shared group password and protect admin routes with a separate admin credential
 - [ ] **Phase 4: Automation and Deployment** - Add nightly collection sync via Vercel Cron, finalize admin user management, and produce a deployment guide
 
@@ -43,10 +43,11 @@ Plans:
   2. A Moxfield collection sync completes by calling the Moxfield API directly with fetch — no browser is launched during sync
   3. Repeated LGS scrape requests for the same card name within the TTL window return cached results without launching a new browser
   4. The deployed function bundle stays within Vercel's 250MB limit (chromium-min fetches binary at runtime, not bundled)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
+- [x] 02-01-PLAN.md — Swap puppeteer for chromium-min + puppeteer-core, update all scraper signatures, rewrite Moxfield to use fetch()
+- [ ] 02-02-PLAN.md — Add in-memory TTL cache for LGS results, update route with maxDuration, add failedStores UI notice
 
 ### Phase 3: Authentication
 **Goal**: Every route requires a valid session cookie — unauthenticated visitors see only the login page, and admin routes require a second stronger credential
@@ -85,6 +86,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Database Migration | 2/2 | Complete    | 2026-03-17 |
-| 2. Serverless Browser Migration | 0/? | Not started | - |
+| 2. Serverless Browser Migration | 2/2 | Complete    | 2026-03-17 |
 | 3. Authentication | 0/? | Not started | - |
 | 4. Automation and Deployment | 0/? | Not started | - |

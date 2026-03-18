@@ -1,12 +1,11 @@
 import "server-only";
+import type { Browser } from "puppeteer-core";
 import type { Product, ScrapeCardProps } from "@/types/product";
-import { getBrowser } from "./browser";
 
-export async function scrapeFTF({ card }: ScrapeCardProps): Promise<Product[]> {
+export async function scrapeFTF({ card, browser }: ScrapeCardProps & { browser: Browser }): Promise<Product[]> {
     const cardUrl = card.toLowerCase().replace(/\s+/g, '-');
     const url = `https://facetofacegames.com/search?q=${cardUrl}&filter__Availability=In+Stock`;
 
-    const browser = await getBrowser();
     const page = await browser.newPage();
 
     try {

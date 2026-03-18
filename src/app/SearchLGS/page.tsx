@@ -9,6 +9,7 @@ export default function SearchLGS() {
     const [results, setResults] = useState<Product[]>([]);
     const [error, setError] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
+    const [failedStores, setFailedStores] = useState<string[]>([]);
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -17,6 +18,7 @@ export default function SearchLGS() {
 
         setIsLoading(true);
         setError("");
+        setFailedStores([]);
 
         try {
             const response = await fetch("/api/scrapeLGS", {
@@ -30,8 +32,12 @@ export default function SearchLGS() {
                 throw new Error(message || "Scrape failed");
             }
 
-            const data = (await response.json()) as { products: Product[] };
+            const data = (await response.json()) as {
+                products: Product[];
+                failedStores?: string[];
+            };
             setResults(data.products || []);
+            setFailedStores(data.failedStores || []);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Something went wrong.");
         } finally {
@@ -65,6 +71,12 @@ export default function SearchLGS() {
 
             {error && <p>{error}</p>}
             {isLoading ? "Searching..." : null}
+
+            {failedStores.length > 0 && (
+                <p className="text-sm text-yellow-600 mb-4">
+                    {failedStores.join(", ")} unavailable — results may be incomplete
+                </p>
+            )}
 
             {/* Results */}
             <ul className="card-search-results">

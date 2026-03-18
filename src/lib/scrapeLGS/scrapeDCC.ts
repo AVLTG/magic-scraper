@@ -1,12 +1,11 @@
 import "server-only";
+import type { Browser } from "puppeteer-core";
 import type { Product, ScrapeCardProps } from "@/types/product";
-import { getBrowser } from "./browser";
 
-export async function scrapeDCC({ card }: ScrapeCardProps): Promise<Product[]> {
+export async function scrapeDCC({ card, browser }: ScrapeCardProps & { browser: Browser }): Promise<Product[]> {
     const cardUrl = card.toLowerCase().replace(/\s+/g, '+');
     const url = `https://www.dungeoncomicsandcards.ca/search?q=${cardUrl}&type=product&filter.v.availability=1`;
 
-    const browser = await getBrowser();
     const page = await browser.newPage();
 
     try {        

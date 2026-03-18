@@ -1,18 +1,40 @@
-import { closeBrowser } from '@/lib/scrapeLGS/browser';
-import { scrapeETB } from './scrapeETB';
-import { scrape401 } from './scrape401';
-import { scrapeDCC } from './scrapeDCC';
-import { scrapeFTF } from './scrapeFTF';
+import "server-only";
+import { launchBrowser } from "./browser";
+import { scrapeETB } from "./scrapeETB";
+import { scrapeDCC } from "./scrapeDCC";
+import { scrapeFTF } from "./scrapeFTF";
+import type { Product } from "@/types/product";
 
-export async function scrapeAllSites(card: string) {
-  const results = await Promise.all([
-    scrapeETB({ card }),
-    // scrape401({ card }),
-    scrapeDCC({ card }),
-    scrapeFTF({ card }),
+export async function scrapeAllSites(
+  card: string
+): Promise<{ products: Product[]; failedStores: string[] }> {
+  const browser = await launchBrowser();
+  try {
+    const results = await Promise.allSettled([
+      scrapeETB({ card, browser }),
+      scrapeDCC({ card, browser }),
+      scrapeFTF({ card, browser }),
+    ]);
 
-  ]);
-  
-  await closeBrowser();  // Close browser after all scraping is done
-  return results.flat();
+    const products: Product[] = [];
+    const failedStores: string[] = [];
+    const storeNames = [
+      "Enter The Battlefield",
+      "Dungeon Comics and Cards",
+      "Face to Face Games",
+    ];
+
+    results.forEach((result, i) => {
+      if (result.status === "fulfilled") {
+        products.push(...result.value);
+      } else {
+        console.error(`${storeNames[i]} failed:`, result.reason);
+        failedStores.push(storeNames[i]);
+      }
+    });
+
+    return { products, failedStores };
+  } finally {
+    await browser.close();
+  }
 }
