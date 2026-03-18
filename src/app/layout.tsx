@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Archivo, Archivo_Narrow } from "next/font/google";
 import "./globals.css";
 import ConditionalHeader from "./components/conditional-header";
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const archivo = Archivo({
   variable: "--font-archivo",
@@ -30,6 +31,7 @@ children,
       >
         <ConditionalHeader />
         {children}
+        <SpeedInsights />
       </body>
     </html>
   );
