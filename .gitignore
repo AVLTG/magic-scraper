@@ -46,7 +46,7 @@ next-env.d.ts
 prima/dev.db
 prisma/dev.db-journal
 *.db
-*.db-journal
+*.db-*
 
 # Seeded Users
 src/lib/seedUsers.ts
@@ -54,3 +54,7 @@ seedUsers.ts
 # Turso CLI local artifacts (rooted to project root, not source paths)
 /auth
 /auth-wal
+
+#Claude
+.claude/
+.planning/

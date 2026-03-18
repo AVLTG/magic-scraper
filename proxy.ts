@@ -12,6 +12,11 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Skip cron paths — authenticated by Bearer token at route level, not session cookie
+  if (pathname.startsWith('/api/cron')) {
+    return NextResponse.next()
+  }
+
   // Check group session cookie
   const sessionCookie = request.cookies.get(COOKIE_NAMES.session)
   const hasSession = sessionCookie && verifyHmac(sessionCookie.value, COOKIE_NAMES.session)

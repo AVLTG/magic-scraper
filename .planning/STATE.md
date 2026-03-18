@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Completed 03-02-PLAN.md — login page UI and full authentication flow verified
-last_updated: "2026-03-17T20:12:17.807Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-03-17T21:03:14.901Z"
 last_activity: 2026-03-17 — Phase 2 plan 1 complete (puppeteer → chromium-min + fetch migration)
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 4
+  total_plans: 10
+  completed_plans: 10
   percent: 37
 ---
 
@@ -55,6 +55,9 @@ Progress: [████░░░░░░] 37%
 | Phase 03-authentication P01 | 12 | 2 tasks | 10 files |
 | Phase 03-authentication P00 | 4 | 2 tasks | 4 files |
 | Phase 03-authentication P02 | 20 | 3 tasks | 5 files |
+| Phase 04-automation-and-deployment P01 | 8 | 2 tasks | 5 files |
+| Phase 04-automation-and-deployment P02 | 2 | 3 tasks | 4 files |
+| Phase 04-automation-and-deployment P03 | 3 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -84,6 +87,14 @@ Recent decisions affecting current work:
 - [Phase 03-02]: ConditionalHeader uses usePathname('/login') check — avoids per-page layout logic, single wrapper in root layout
 - [Phase 03-02]: Logout is a button (not Link) because it fires a POST fetch before navigating — semantic correctness
 - [Phase 03-02]: Admin page no longer holds password state — proxy cookie (admin_session) is the sole auth gate
+- [Phase 04-01]: maxDuration = 300 on cron route — Vercel Fluid Compute budget for multi-user sync
+- [Phase 04-01]: Bearer token compared with strict equality against CRON_SECRET — simple stateless machine-to-machine auth
+- [Phase 04-01]: Proxy exclusion uses /api/cron path prefix — future cron routes automatically excluded without proxy changes
+- [Phase 04-02]: params awaited as Promise<{id}> in DELETE handler — Next.js 15+ requirement
+- [Phase 04-02]: Two-step delete confirm uses local state (deleteConfirm userId) — no modal needed, inline pattern
+- [Phase 04-03]: DEPLOYMENT.md covers prisma db push (not migrate deploy) — Turso incompatibility documented
+- [Phase 04-03]: Fluid Compute section added with explicit Vercel dashboard path — addresses STATE.md concern
+- [Phase 04-03]: Hobby tier plus or minus 59 min cron variance documented to set expectations
 
 ### Pending Todos
 
@@ -98,6 +109,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T19:51:43.078Z
-Stopped at: Completed 03-02-PLAN.md — login page UI and full authentication flow verified
+Last session: 2026-03-17T20:58:14.381Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None

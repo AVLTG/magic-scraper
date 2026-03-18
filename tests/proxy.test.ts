@@ -104,4 +104,11 @@ describe('proxy route protection', () => {
     const redirectUrl: URL = mockRedirect.mock.calls[0][0]
     expect(redirectUrl.pathname).toBe('/login')
   })
+
+  it('skips /api/cron paths without session cookie', () => {
+    const req = makeMockRequest('/api/cron/sync-collections')
+    proxy(req)
+    expect(mockNext).toHaveBeenCalledTimes(1)
+    expect(mockRedirect).not.toHaveBeenCalled()
+  })
 })

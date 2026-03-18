@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Database Migration** - Replace local SQLite with Turso cloud DB so the app can persist data on Vercel (completed 2026-03-17)
 - [x] **Phase 2: Serverless Browser Migration** - Swap Puppeteer for serverless-compatible Chromium and replace the Moxfield browser scraper with a plain fetch call (completed 2026-03-17)
 - [x] **Phase 3: Authentication** - Gate all routes behind a shared group password and protect admin routes with a separate admin credential (completed 2026-03-17)
-- [ ] **Phase 4: Automation and Deployment** - Add nightly collection sync via Vercel Cron, finalize admin user management, and produce a deployment guide
+- [x] **Phase 4: Automation and Deployment** - Add nightly collection sync via Vercel Cron, finalize admin user management, and produce a deployment guide (completed 2026-03-17)
 
 ## Phase Details
 
@@ -75,10 +75,12 @@ Plans:
   3. Admin can add a new user with a name and Moxfield collection ID via the admin panel UI — the user appears in the deck checker immediately
   4. Admin can delete a user from the admin panel — the user and all their cards are removed
   5. A developer following the deployment guide alone can deploy a working instance of the app on Vercel + Turso free tier with no undocumented steps
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Vercel Cron nightly sync route with Bearer token auth, proxy exclusion, and unit tests
+- [ ] 04-02-PLAN.md — User management API routes (add/delete) and admin page UI extension with user list and add form
+- [ ] 04-03-PLAN.md — Deployment guide (DEPLOYMENT.md) covering local dev, Turso, Vercel, env vars, cron, and post-deploy verification
 
 ## Progress
 
@@ -90,4 +92,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Database Migration | 2/2 | Complete    | 2026-03-17 |
 | 2. Serverless Browser Migration | 2/2 | Complete    | 2026-03-17 |
 | 3. Authentication | 3/3 | Complete    | 2026-03-17 |
-| 4. Automation and Deployment | 0/? | Not started | - |
+| 4. Automation and Deployment | 3/3 | Complete   | 2026-03-17 |

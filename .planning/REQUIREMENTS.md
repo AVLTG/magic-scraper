@@ -27,18 +27,18 @@
 
 ### Automation
 
-- [ ] **AUTO-01**: Vercel Cron job triggers nightly Moxfield collection sync for all users
-- [ ] **AUTO-02**: Cron route validates `Authorization: Bearer <CRON_SECRET>` header before running sync
+- [x] **AUTO-01**: Vercel Cron job triggers nightly Moxfield collection sync for all users
+- [x] **AUTO-02**: Cron route validates `Authorization: Bearer <CRON_SECRET>` header before running sync
 
 ### Admin
 
-- [ ] **ADMIN-01**: Admin can add a new user (name + Moxfield collection ID) via the admin panel
-- [ ] **ADMIN-02**: Admin can delete a user (and their cards) via the admin panel
-- [ ] **ADMIN-03**: Admin can manually trigger a full collection refresh from the admin panel (existing feature, now auth-protected)
+- [x] **ADMIN-01**: Admin can add a new user (name + Moxfield collection ID) via the admin panel
+- [x] **ADMIN-02**: Admin can delete a user (and their cards) via the admin panel
+- [x] **ADMIN-03**: Admin can manually trigger a full collection refresh from the admin panel (existing feature, now auth-protected)
 
 ### Deployment
 
-- [ ] **DEPLOY-01**: Step-by-step deployment guide covers Turso setup, Vercel project setup, all required env vars, and first deploy
+- [x] **DEPLOY-01**: Step-by-step deployment guide covers Turso setup, Vercel project setup, all required env vars, and first deploy
 
 ## v2 Requirements
 
@@ -84,12 +84,12 @@
 | AUTH-02 | Phase 3 | Complete |
 | AUTH-03 | Phase 3 | Complete |
 | AUTH-04 | Phase 3 | Complete |
-| AUTO-01 | Phase 4 | Pending |
-| AUTO-02 | Phase 4 | Pending |
-| ADMIN-01 | Phase 4 | Pending |
-| ADMIN-02 | Phase 4 | Pending |
-| ADMIN-03 | Phase 4 | Pending |
-| DEPLOY-01 | Phase 4 | Pending |
+| AUTO-01 | Phase 4 | Complete |
+| AUTO-02 | Phase 4 | Complete |
+| ADMIN-01 | Phase 4 | Complete |
+| ADMIN-02 | Phase 4 | Complete |
+| ADMIN-03 | Phase 4 | Complete |
+| DEPLOY-01 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 17 total
