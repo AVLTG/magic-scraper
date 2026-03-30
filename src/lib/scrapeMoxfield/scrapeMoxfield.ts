@@ -1,5 +1,6 @@
 import "server-only";
-import { fetch as undiciFetch, ProxyAgent } from "undici";
+import https from "node:https";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import type { MoxfieldCard } from "@/types/moxfield";
 
 const USER_AGENT =
@@ -19,19 +20,44 @@ function getMoxfieldHeaders(): Record<string, string> {
   return headers;
 }
 
-async function fetchMoxfield(targetUrl: string): Promise<Response> {
-  const apiKey = process.env.APIFY_API;
-  if (!apiKey) {
-    throw new Error("APIFY_API is not set");
+function httpsGet(url: string, agent: HttpsProxyAgent<string>): Promise<{ status: number; ok: boolean; text: () => string }> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = https.request(
+      {
+        hostname: parsed.hostname,
+        path: parsed.pathname + parsed.search,
+        headers: getMoxfieldHeaders(),
+        agent,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const body = Buffer.concat(chunks).toString("utf-8");
+          const status = res.statusCode ?? 0;
+          resolve({
+            status,
+            ok: status >= 200 && status < 300,
+            text: () => body,
+          });
+        });
+      }
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+async function fetchMoxfield(targetUrl: string) {
+  const proxyPassword = process.env.APIFY_ID;
+  if (!proxyPassword) {
+    throw new Error("APIFY_ID is not set");
   }
 
-  const proxyUrl = `http://auto:${apiKey}@proxy.apify.com:8000`;
-  const dispatcher = new ProxyAgent(proxyUrl);
-
-  return undiciFetch(targetUrl, {
-    dispatcher,
-    headers: getMoxfieldHeaders(),
-  }) as unknown as Response;
+  const proxyUrl = `http://auto:${proxyPassword}@proxy.apify.com:8000`;
+  const agent = new HttpsProxyAgent(proxyUrl);
+  return httpsGet(targetUrl, agent);
 }
 
 export async function scrapeMoxfield({
@@ -57,7 +83,7 @@ export async function scrapeMoxfield({
       break;
     }
 
-    const apiData = await response.json();
+    const apiData = JSON.parse(response.text());
 
     if (!apiData || !apiData.data) {
       break;

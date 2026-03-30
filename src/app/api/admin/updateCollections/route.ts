@@ -8,9 +8,10 @@ export async function POST() {
     await updateAllCollections();
     return NextResponse.json({ success: true, message: 'Collections updated successfully' });
   } catch (error) {
-    console.error('Update error:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Update error:', message);
     return NextResponse.json(
-      { error: 'Failed to update collections' },
+      { error: message },
       { status: 500 }
     );
   }
