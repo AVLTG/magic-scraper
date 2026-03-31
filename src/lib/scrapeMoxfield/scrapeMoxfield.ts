@@ -16,7 +16,8 @@ async function fetchMoxfield(targetUrl: string): Promise<unknown> {
     const proxyUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
     const res = await fetch(proxyUrl);
     if (!res.ok) {
-      throw new Error(`ScraperAPI returned ${res.status}: ${await res.text()}`);
+      const body = await res.text();
+      throw new Error(`ScraperAPI returned ${res.status} for ${targetUrl}: ${body}`);
     }
     return res.json();
   }
