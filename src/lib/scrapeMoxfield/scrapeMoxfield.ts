@@ -39,7 +39,8 @@ export async function scrapeMoxfield({
     const apiUrl = `https://api2.moxfield.com/v1/collections/search/${collectionId}?sortType=cardName&sortDirection=ascending&pageNumber=${pageNumber}&pageSize=${pageSize}&playStyle=paperDollars&pricingProvider=cardkingdom`;
     console.log(`Fetching page ${pageNumber}...`);
 
-    const apiData = await fetchMoxfield(apiUrl) as { data?: Record<string, unknown> };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const apiData = await fetchMoxfield(apiUrl) as { data?: Record<string, any> };
 
     if (!apiData || !apiData.data) {
       break;
