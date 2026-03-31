@@ -71,20 +71,20 @@ export default function CheckDeck() {
     switch (condition.toLowerCase()) {
       case "nearmint":
       case "near mint":
-        return "text-green-700";
+        return "text-emerald-400";
       case "lightlyplayed":
       case "lightly played":
-        return "text-blue-700";
+        return "text-sky-400";
       case "moderatelyplayed":
       case "moderately played":
-        return "text-yellow-700";
+        return "text-amber-400";
       case "heavilyplayed":
       case "heavily played":
-        return "text-orange-700";
+        return "text-orange-400";
       case "damaged":
-        return "text-red-700";
+        return "text-red-400";
       default:
-        return "text-gray-700";
+        return "text-muted";
     }
   };
 
@@ -98,115 +98,126 @@ export default function CheckDeck() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-8">
-      <h1 className="text-4xl mb-8">Deck Checker</h1>
+    <div className="py-8">
+      <h1 className="text-3xl mb-2">Deck Checker</h1>
+      <p className="text-muted mb-6">Paste a decklist to find matches in your friends&apos; collections.</p>
 
       <form onSubmit={handleSubmit} className="mb-8">
         <textarea
           value={decklist}
           onChange={(e) => setDecklist(e.target.value)}
-          placeholder="Paste your decklist here..."
-          className="w-full h-96 p-4 border rounded font-mono text-sm"
+          placeholder="1 Lightning Bolt&#10;4 Counterspell&#10;2 Swords to Plowshares&#10;..."
+          className="w-full h-72 p-4 rounded-lg border border-border bg-surface text-foreground font-mono text-sm placeholder:text-muted/40 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
           disabled={isLoading}
         />
         <button
           type="submit"
           disabled={isLoading}
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          className="mt-3 px-6 py-2.5 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isLoading ? "Checking..." : "Check Deck"}
         </button>
       </form>
 
-      {error && <p className="text-red-500 mb-4">{error}</p>}
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 mb-6">
+          <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
 
       {results.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-2xl mb-4">
-            Found Matches ({results.length} cards)
-          </h2>
-          {results.map((card) => (
-            <div key={card.cardName} className="border rounded">
-              <button
-                onClick={() => toggleCard(card.cardName)}
-                className="w-full p-4 flex items-center justify-between hover:bg-gray-50"
-              >
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-lg">{card.cardName}</span>
-                  <span className="text-sm text-gray-500">
-                    {card.printings.length} printing{card.printings.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                {expandedCards.has(card.cardName) ? (
-                  <ChevronDown className="w-5 h-5" />
-                ) : (
-                  <ChevronRight className="w-5 h-5" />
-                )}
-              </button>
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-2xl">Matches</h2>
+            <span className="text-sm font-medium text-accent bg-accent-muted px-2.5 py-0.5 rounded-full">
+              {results.length} cards
+            </span>
+          </div>
 
-              {expandedCards.has(card.cardName) && (
-                <div className="p-4 bg-gray-50">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {card.printings.map((printing, idx) => (
-                      <div
-                        key={idx}
-                        className="group relative border rounded bg-white p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                      >
-                        {/* Hover image - positioned with fixed to avoid overflow issues */}
-                        <div className="hidden group-hover:block fixed z-[9999] pointer-events-none">
-                          <img
-                            src={`https://api.scryfall.com/cards/${printing.scryfallId}?format=image`}
-                            alt={card.cardName}
-                            className="w-64 rounded-lg shadow-2xl border-2 border-gray-300"
-                            style={{
-                              position: 'fixed',
-                              right: '20px',
-                              bottom: '20px',
-                            }}
-                          />
-                        </div>
-
-                        {/* Set info */}
-                        <div className="font-semibold text-sm mb-2 border-b pb-2">
-                          {printing.setName}
-                          <span className="text-xs text-gray-500 ml-2">
-                            ({printing.set.toUpperCase()})
-                          </span>
-                        </div>
-
-                        {/* Owners */}
-                        <div className="space-y-1">
-                          {printing.owners.map((owner, ownerIdx) => (
-                            <div
-                              key={ownerIdx}
-                              className="flex items-center justify-between text-sm"
-                            >
-                              <span className="font-medium truncate mr-2">
-                                {owner.name}
-                              </span>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
-                                  x{owner.quantity}
-                                </span>
-                                <span className={`text-xs ${getConditionColor(owner.condition)}`}>
-                                  {formatCondition(owner.condition)}
-                                </span>
-                                {owner.isFoil && (
-                                  <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
-                                    ✨
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+          <div className="space-y-2">
+            {results.map((card) => (
+              <div key={card.cardName} className="rounded-lg border border-border overflow-hidden">
+                <button
+                  onClick={() => toggleCard(card.cardName)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold">{card.cardName}</span>
+                    <span className="text-xs text-muted bg-surface px-2 py-0.5 rounded-full">
+                      {card.printings.length} printing{card.printings.length !== 1 ? "s" : ""}
+                    </span>
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
+                  {expandedCards.has(card.cardName) ? (
+                    <ChevronDown className="w-4 h-4 text-muted" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-muted" />
+                  )}
+                </button>
+
+                {expandedCards.has(card.cardName) && (
+                  <div className="px-4 pb-4 border-t border-border bg-surface/50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-3">
+                      {card.printings.map((printing, idx) => (
+                        <div
+                          key={idx}
+                          className="group relative rounded-lg border border-border bg-background p-3 hover:border-accent/40 transition-colors"
+                        >
+                          {/* Hover image */}
+                          <div className="hidden group-hover:block fixed z-[9999] pointer-events-none">
+                            <img
+                              src={`https://api.scryfall.com/cards/${printing.scryfallId}?format=image`}
+                              alt={card.cardName}
+                              className="w-64 rounded-lg shadow-2xl border border-border"
+                              style={{
+                                position: 'fixed',
+                                right: '20px',
+                                bottom: '20px',
+                              }}
+                            />
+                          </div>
+
+                          {/* Set info */}
+                          <div className="font-medium text-sm mb-2 pb-2 border-b border-border">
+                            {printing.setName}
+                            <span className="text-xs text-muted ml-2">
+                              ({printing.set.toUpperCase()})
+                            </span>
+                          </div>
+
+                          {/* Owners */}
+                          <div className="space-y-1.5">
+                            {printing.owners.map((owner, ownerIdx) => (
+                              <div
+                                key={ownerIdx}
+                                className="flex items-center justify-between text-sm"
+                              >
+                                <span className="font-medium truncate mr-2 text-foreground/80">
+                                  {owner.name}
+                                </span>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="bg-surface text-muted px-1.5 py-0.5 rounded text-xs font-mono">
+                                    x{owner.quantity}
+                                  </span>
+                                  <span className={`text-xs font-medium ${getConditionColor(owner.condition)}`}>
+                                    {formatCondition(owner.condition)}
+                                  </span>
+                                  {owner.isFoil && (
+                                    <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-medium">
+                                      Foil
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

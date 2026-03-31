@@ -40,27 +40,27 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-sm">
         {message === "admin-required" && (
-          <div className="mb-4 rounded-lg border border-accent2 bg-accent2/30 px-4 py-3 max-w-sm w-full">
-            <p className="text-sm font-bold text-foreground">
+          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <p className="text-sm font-medium text-amber-400">
               Admin access required — enter the admin password
             </p>
           </div>
         )}
 
-        <div className="bg-background border border-accent2 rounded-2xl shadow-md px-8 py-10 w-full max-w-sm">
+        <div className="rounded-xl border border-border bg-surface p-8">
           <h1 className="text-xl font-bold font-narrow text-foreground mb-1">
             MTGCardSearch
           </h1>
-          <p className="text-sm text-foreground/70 mb-6">
+          <p className="text-sm text-muted mb-6">
             Enter group password to continue
           </p>
 
           <form onSubmit={handleSubmit}>
             <div>
-              <label className="text-sm font-bold text-foreground mb-1 block">
+              <label className="text-sm font-medium text-foreground mb-1.5 block">
                 Password
               </label>
               <input
@@ -68,7 +68,7 @@ function LoginContent() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-lg border border-accent2 bg-background px-3 py-2 text-base text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-accent1/50"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
                 disabled={isLoading}
               />
             </div>
@@ -76,13 +76,13 @@ function LoginContent() {
             <button
               type="submit"
               disabled={isLoading}
-              className={`mt-6 w-full justify-center rounded-xl bg-accent1 px-6 py-3 text-lg font-medium cursor-pointer text-background hover:opacity-90 flex items-center${isLoading ? " opacity-60 cursor-not-allowed" : ""}`}
+              className={`mt-6 w-full rounded-lg bg-accent px-6 py-2.5 text-base font-medium text-white hover:bg-accent-hover transition-colors cursor-pointer${isLoading ? " opacity-50 cursor-not-allowed" : ""}`}
             >
               {isLoading ? "Signing in..." : "Sign in"}
             </button>
 
             {error && (
-              <p className="mt-3 text-sm font-bold text-red-600">{error}</p>
+              <p className="mt-3 text-sm font-medium text-red-400">{error}</p>
             )}
           </form>
         </div>

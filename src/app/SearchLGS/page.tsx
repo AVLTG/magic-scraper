@@ -46,55 +46,85 @@ export default function SearchLGS() {
     };
 
     return (
-        <div>
-            <div className="flex items-end justify-between mb-8 pb-2 border-b">
-                <h1 className="text-4xl">LGS Card Search</h1>
+        <div className="py-8">
+            <div className="flex items-end justify-between mb-8 pb-6 border-b border-border">
+                <div>
+                    <h1 className="text-3xl">LGS Card Search</h1>
+                    <p className="text-muted text-sm mt-1">Search local game store inventory</p>
+                </div>
 
-                {/* Search */}
-                <form onSubmit={handleSubmit} className="card-search-form">
-                    <div className="relative card-search-input-container">
+                <form onSubmit={handleSubmit} className="flex gap-2">
+                    <div className="relative">
                         <input
                             type="text"
-                            placeholder="Insert card name"
+                            placeholder="Card name..."
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             disabled={isLoading}
-                            className="card-search-input"
+                            className="w-64 rounded-lg border border-border bg-surface pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
                         />
-                        <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
                     </div>
-                    {/* <button type="submit" disabled={isLoading} className="card-search-button">
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="px-4 py-2 bg-accent text-white text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 cursor-pointer"
+                    >
                         {isLoading ? "Searching..." : "Search"}
-                    </button> */}
+                    </button>
                 </form>
             </div>
 
-            {error && <p>{error}</p>}
-            {isLoading ? "Searching..." : null}
-
-            {failedStores.length > 0 && (
-                <p className="text-sm text-yellow-600 mb-4">
-                    {failedStores.join(", ")} unavailable — results may be incomplete
-                </p>
+            {error && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 mb-6">
+                    <p className="text-sm text-red-400">{error}</p>
+                </div>
             )}
 
-            {/* Results */}
-            <ul className="card-search-results">
-                {results.map((product) => (
-                    <li key={product.link} className="card-search-item">
-                        <img src={product.image} alt={product.title} width={315} height={440} />
-                        <a href={product.link} rel="noopener noreferrer" target="_blank" className="flex justify-between mt-2 gap-4 w-[320px]">
-                            <div className="flex flex-col min-w-0">
-                                <span className="font-bold">{product.title}</span>
-                                <span className="text-sm text-gray-500 uppercase font-mono">{product.store}</span>
+            {isLoading && (
+                <p className="text-muted text-sm">Searching stores...</p>
+            )}
+
+            {failedStores.length > 0 && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 mb-6">
+                    <p className="text-sm text-amber-400">
+                        {failedStores.join(", ")} unavailable — results may be incomplete
+                    </p>
+                </div>
+            )}
+
+            {results.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {results.map((product) => (
+                        <a
+                            key={product.link}
+                            href={product.link}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                            className="group rounded-lg border border-border bg-surface overflow-hidden hover:border-accent/40 transition-colors"
+                        >
+                            <div className="aspect-[315/440] overflow-hidden bg-background">
+                                <img
+                                    src={product.image}
+                                    alt={product.title}
+                                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
+                                />
                             </div>
-                            <div className="flex-shrink-0 rounded-md bg-accent1 h-min px-2 py-1 text-background">
-                                {product.price}
+                            <div className="p-3">
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="min-w-0">
+                                        <p className="font-medium text-sm text-foreground truncate">{product.title}</p>
+                                        <p className="text-xs text-muted uppercase font-mono mt-0.5">{product.store}</p>
+                                    </div>
+                                    <span className="flex-shrink-0 text-sm font-semibold text-accent bg-accent-muted px-2 py-0.5 rounded">
+                                        {product.price}
+                                    </span>
+                                </div>
                             </div>
                         </a>
-                    </li>
-                ))}
-            </ul>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

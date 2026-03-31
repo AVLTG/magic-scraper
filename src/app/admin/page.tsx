@@ -91,95 +91,98 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-8" onClick={() => setDeleteConfirm(null)}>
-      <h1 className="text-4xl mb-8">Admin Panel</h1>
+    <div className="max-w-2xl mx-auto py-8" onClick={() => setDeleteConfirm(null)}>
+      <h1 className="text-3xl mb-8">Admin Panel</h1>
 
       {/* Users section */}
-      <h2 className="text-2xl mb-4">Users</h2>
-      {users.length === 0 ? (
-        <p>No users found.</p>
-      ) : (
-        <div className="space-y-2">
-          {users.map((user) => (
-            <div
-              key={user.id}
-              className="flex items-center justify-between p-3 bg-gray-100 rounded-lg"
-            >
-              <div>
-                <span>{user.name}</span>
-                <span className="text-sm text-gray-500 ml-2">{user.moxfieldCollectionId}</span>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(user.id);
-                }}
-                className={
-                  deleteConfirm === user.id
-                    ? "px-3 py-1 bg-red-700 text-white rounded cursor-pointer"
-                    : "px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer"
-                }
+      <div className="rounded-lg border border-border bg-surface p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Users</h2>
+        {users.length === 0 ? (
+          <p className="text-muted text-sm">No users found.</p>
+        ) : (
+          <div className="space-y-2">
+            {users.map((user) => (
+              <div
+                key={user.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-background border border-border"
               >
-                {deleteConfirm === user.id ? "Are you sure?" : "Delete"}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+                <div className="min-w-0">
+                  <span className="font-medium">{user.name}</span>
+                  <span className="text-sm text-muted ml-2 font-mono">{user.moxfieldCollectionId}</span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(user.id);
+                  }}
+                  className={`ml-3 flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                    deleteConfirm === user.id
+                      ? "bg-destructive text-white"
+                      : "bg-destructive/10 text-red-400 hover:bg-destructive/20"
+                  }`}
+                >
+                  {deleteConfirm === user.id ? "Confirm?" : "Delete"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Add User form */}
-      <h2 className="text-2xl mb-4 mt-8">Add User</h2>
-      <form onSubmit={handleAddUser} className="space-y-3">
-        <input
-          type="text"
-          value={addName}
-          onChange={(e) => setAddName(e.target.value)}
-          placeholder="Name"
-          required
-          className="block w-full px-4 py-2 border rounded-lg"
-        />
-        <input
-          type="text"
-          value={addCollectionId}
-          onChange={(e) => setAddCollectionId(e.target.value)}
-          placeholder="Moxfield Collection ID"
-          required
-          className="block w-full px-4 py-2 border rounded-lg"
-        />
-        <button
-          type="submit"
-          disabled={isAdding || !addName.trim() || !addCollectionId.trim()}
-          className="px-6 py-3 bg-accent1 text-background rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        >
-          {isAdding ? "Adding..." : "Add User"}
-        </button>
-      </form>
+      <div className="rounded-lg border border-border bg-surface p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Add User</h2>
+        <form onSubmit={handleAddUser} className="space-y-3">
+          <input
+            type="text"
+            value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            placeholder="Name"
+            required
+            className="block w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+          />
+          <input
+            type="text"
+            value={addCollectionId}
+            onChange={(e) => setAddCollectionId(e.target.value)}
+            placeholder="Moxfield Collection ID"
+            required
+            className="block w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={isAdding || !addName.trim() || !addCollectionId.trim()}
+            className="px-5 py-2.5 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {isAdding ? "Adding..." : "Add User"}
+          </button>
+        </form>
 
-      {/* User operation feedback */}
-      {userMessage && (
-        <p className={`mt-4 ${userMessage.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>
-          {userMessage}
-        </p>
-      )}
+        {userMessage && (
+          <p className={`mt-4 text-sm font-medium ${userMessage.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>
+            {userMessage}
+          </p>
+        )}
+      </div>
 
-      <hr className="my-8" />
-
-      {/* Existing Update All Collections section */}
-      <div className="space-y-4">
+      {/* Update All Collections section */}
+      <div className="rounded-lg border border-border bg-surface p-6">
+        <h2 className="text-lg font-semibold mb-4">Sync Collections</h2>
+        <p className="text-sm text-muted mb-4">Re-scrape all Moxfield collections and update the database.</p>
         <button
           onClick={handleUpdate}
           disabled={isUpdating}
-          className="px-6 py-3 bg-accent1 text-background rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="px-5 py-2.5 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isUpdating ? "Updating..." : "Update All Collections"}
         </button>
-      </div>
 
-      {message && (
-        <p className={`mt-4 ${message.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>
-          {message}
-        </p>
-      )}
+        {message && (
+          <p className={`mt-4 text-sm font-medium ${message.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>
+            {message}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -24,12 +24,14 @@ children,
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
-        className={`${archivo.variable} ${archivoNarrow.variable} antialiased lg:px-16`}
+        className={`${archivo.variable} ${archivoNarrow.variable} antialiased`}
       >
-        <ConditionalHeader />
-        {children}
+        <div className="mx-auto max-w-7xl px-6 lg:px-10">
+          <ConditionalHeader />
+          {children}
+        </div>
       </body>
     </html>
   );
