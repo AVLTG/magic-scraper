@@ -53,7 +53,13 @@
   3. Deck autocomplete maintains a separate list of all previously entered deck names; user can add new names
   4. User can view all past games in a newest-first table and click to edit or delete any entry
   5. Scraper API routes return 429 after exceeding rate limit; normal usage is unaffected
-**Plans**: TBD
+**Plans**: 6 plans
+- [ ] 06-01-foundation-rate-limit-PLAN.md — Add npm test script and build sliding-window rate limit helper (getIpKey + checkRateLimit) with unit tests
+- [ ] 06-02-combobox-component-PLAN.md — Build headless Combobox React component (hand-rolled per D-07) with keyboard nav, ARIA, and Add-new row + pure-helper unit tests
+- [ ] 06-03-autocomplete-api-PLAN.md — Create GET /api/players (union of Moxfield users + participant history) and GET /api/decks autocomplete routes with rate limiting
+- [ ] 06-04-games-api-PLAN.md — Create /api/games POST+GET and /api/games/[id] GET+PATCH+DELETE using gameSchema.parse and $transaction, with full integration tests
+- [ ] 06-05-scraper-rate-limit-PLAN.md — Apply tighter 10/60s rate limit to existing /api/checkDeck and /api/scrapeLGS routes (additive edit, no behavior change)
+- [ ] 06-06-games-pages-PLAN.md — Build /games, /games/new, /games/[id]/edit pages, GameForm, DeleteConfirmModal, header nav link, end-to-end checkpoint
 **UI hint**: yes
 
 ### Phase 7: Stats Dashboard
