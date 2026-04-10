@@ -38,7 +38,10 @@
   2. Production Turso schema matches local after manual `turso db shell` migration
   3. All existing app routes (deck checker, admin, LGS scraper) still function after schema change
   4. Prisma client regenerated and TypeScript compiles without errors
-**Plans**: TBD
+**Plans**: 3 plans
+  - [x] 05-01-PLAN.md — Add Game/GameParticipant/SyncLog models to prisma/schema.prisma and apply to local dev via prisma db push
+  - [x] 05-02-PLAN.md — Install zod, create src/lib/validators.ts, and write .planning/codebase/SCHEMA.md design doc
+  - [x] 05-03-PLAN.md — Back up production Turso, generate migration.sql, and apply to production via turso db shell
 
 ### Phase 6: Game Tracking Core
 **Goal**: Users can log new games with autocomplete player/deck selection, view game history, and edit or delete past games; API routes are rate limited
@@ -96,7 +99,7 @@
 | 2. Serverless Browser Migration | v1.0 | 2/2 | Complete | 2026-03-17 |
 | 3. Authentication | v1.0 | 3/3 | Complete | 2026-03-17 |
 | 4. Automation and Deployment | v1.0 | 3/3 | Complete | 2026-03-17 |
-| 5. Schema Migration & Foundation | v1.1 | 0/? | Not started | - |
+| 5. Schema Migration & Foundation | v1.1 | 0/3 | Planned | - |
 | 6. Game Tracking Core | v1.1 | 0/? | Not started | - |
 | 7. Stats Dashboard | v1.1 | 0/? | Not started | - |
 | 8. Admin Improvements | v1.1 | 0/? | Not started | - |
