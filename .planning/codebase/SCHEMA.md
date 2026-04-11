@@ -28,6 +28,7 @@ and `model SyncLog` (see `prisma/schema.prisma`).
 | date | DateTime | When the game was played (required) |
 | wonByCombo | Boolean | Default false; "was this won via a combo finish?" |
 | notes | String? | Free-text game notes (optional) |
+| isImported | Boolean | Default false. Flags ~20 spreadsheet-ported legacy games (Phase 6.1 D-01). **Hidden from UI (D-02)** — never rendered, edited, or exposed in any form. Only read by Phase 7 stats queries to exclude combo-rate and deck-based metrics (D-06); player-rate / screwed-rate / weekly-frequency stats still include imported rows (D-07). |
 | createdAt | DateTime | Audit timestamp; no `updatedAt` (D-01) |
 
 Indexes: `@@index([date])` — powers GAME-07 newest-first history (D-09).
@@ -35,6 +36,16 @@ Indexes: `@@index([date])` — powers GAME-07 newest-first history (D-09).
 Relations: `participants GameParticipant[]` (1-4 rows per GAME-01).
 
 Serves: GAME-01, GAME-07, GAME-08, STAT-04 (weekly frequency), STAT-07 (reactive updates).
+
+**Phase 6.1 addendum — `isImported`:**
+
+Added in Phase 6.1 via `prisma db push` (local dev) and `turso db shell` ALTER TABLE (production, additive-only per Phase 5 D-16). The 20 legacy rows whose `notes` contain the substring `"Ported from Spreadsheet"` were backfilled to `isImported = 1` via one-off UPDATE. The `notes` text was deliberately NOT cleaned up (D-04) — two redundant indicators for one fact is fine, and the human-readable note remains visible in the `/games` table.
+
+**Phase 7 semantics:**
+- Combo-rate and per-deck metrics MUST filter `WHERE isImported = false` (D-06)
+- Player win-rate, screwed-rate, weekly frequency, and participation stats include imported rows (D-07 — `date`, `playerName`, `isWinner`, `isScrewed` were accurate in the source spreadsheet)
+
+**UI invariant:** no file under `src/app/games/**` or `src/app/api/games/**` reads, writes, displays, or accepts this field (D-02). If any future plan needs to make it editable, a decision must be captured first — accidentally flipping the flag for a live game would silently corrupt Phase 7 stats.
 
 ### `game_participants` (Prisma model `GameParticipant`)
 
