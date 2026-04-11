@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { DeleteConfirmModal } from '@/app/games/delete-confirm-modal';
 
@@ -104,6 +104,11 @@ export default function GamesPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<Game | null>(null);
 
+  // Phase 6.1 D-21: ephemeral client-side filter state (no URL state, no search params)
+  const [winnerFilter, setWinnerFilter] = useState<string | null>(null);
+  const [countFilter, setCountFilter] = useState<2 | 3 | 4 | null>(null);
+  const [playerFilters, setPlayerFilters] = useState<string[]>([]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -149,6 +154,34 @@ export default function GamesPage() {
     }
   };
 
+  // Phase 6.1 D-19, D-20: dynamic option sources from currently-loaded games
+  const winnerOptions = useMemo(() => deriveWinnerOptions(games), [games]);
+  const playerOptions = useMemo(() => derivePlayerOptions(games), [games]);
+
+  // Phase 6.1 D-22: derived filtered list — no refetch, no loading state
+  const filteredGames = useMemo(
+    () =>
+      games.filter((g) =>
+        matchesAllFilters(g, { winner: winnerFilter, playerCount: countFilter, players: playerFilters })
+      ),
+    [games, winnerFilter, countFilter, playerFilters]
+  );
+
+  // Phase 6.1 D-23: any filter active?
+  const anyFilterActive = winnerFilter !== null || countFilter !== null || playerFilters.length > 0;
+
+  const clearFilters = () => {
+    setWinnerFilter(null);
+    setCountFilter(null);
+    setPlayerFilters([]);
+  };
+
+  const togglePlayerFilter = (name: string) => {
+    setPlayerFilters((prev) =>
+      prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name]
+    );
+  };
+
   return (
     <main className="container mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-4">
@@ -161,6 +194,83 @@ export default function GamesPage() {
         </Link>
       </div>
 
+      {games.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs text-muted mb-1">Winner</label>
+            <select
+              value={winnerFilter ?? ''}
+              onChange={(e) => setWinnerFilter(e.target.value === '' ? null : e.target.value)}
+              className="px-3 py-2 rounded-md border border-border bg-surface text-foreground text-sm"
+              disabled={winnerOptions.length === 0}
+            >
+              <option value="">Any winner</option>
+              {winnerOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs text-muted mb-1">Player count</label>
+            <select
+              value={countFilter ?? ''}
+              onChange={(e) =>
+                setCountFilter(e.target.value === '' ? null : (Number(e.target.value) as 2 | 3 | 4))
+              }
+              className="px-3 py-2 rounded-md border border-border bg-surface text-foreground text-sm"
+            >
+              <option value="">Any count</option>
+              <option value="2">2 players</option>
+              <option value="3">3 players</option>
+              <option value="4">4 players</option>
+            </select>
+          </div>
+
+          <div className="flex-1 min-w-[12rem]">
+            <label className="block text-xs text-muted mb-1">
+              Players {playerFilters.length > 0 && `(${playerFilters.length} selected)`}
+            </label>
+            <details className="relative">
+              <summary className="px-3 py-2 rounded-md border border-border bg-surface text-foreground text-sm cursor-pointer list-none">
+                {playerFilters.length === 0 ? 'Any players' : playerFilters.join(', ')}
+              </summary>
+              <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-surface shadow-lg p-2">
+                {playerOptions.length === 0 && (
+                  <p className="text-xs text-muted italic px-1 py-1">No players yet</p>
+                )}
+                {playerOptions.map((name) => (
+                  <label
+                    key={name}
+                    className="flex items-center gap-2 px-1 py-1 text-sm text-foreground hover:bg-surface-hover rounded cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={playerFilters.includes(name)}
+                      onChange={() => togglePlayerFilter(name)}
+                    />
+                    <span>{name}</span>
+                  </label>
+                ))}
+              </div>
+            </details>
+          </div>
+
+          {anyFilterActive && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="px-3 py-2 rounded-md border border-border bg-surface text-accent text-sm hover:bg-surface-hover"
+              aria-label="Clear filters"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
       {error && <p className="text-red-600 mb-4">{error}</p>}
       {isLoading && <p className="text-muted">Loading...</p>}
       {!isLoading && games.length === 0 && (
@@ -170,6 +280,18 @@ export default function GamesPage() {
             Log your first game
           </Link>
           .
+        </p>
+      )}
+      {!isLoading && games.length > 0 && filteredGames.length === 0 && (
+        <p className="text-muted">
+          No games match your filters.{' '}
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="text-accent underline"
+          >
+            Clear filters
+          </button>
         </p>
       )}
 
@@ -185,7 +307,7 @@ export default function GamesPage() {
             </tr>
           </thead>
           <tbody>
-            {games.map((g) => {
+            {filteredGames.map((g) => {
               const winner = g.participants.find((p) => p.isWinner);
               return (
                 <Fragment key={g.id}>
