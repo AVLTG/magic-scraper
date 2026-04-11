@@ -62,6 +62,16 @@
 - [x] 06-06-games-pages-PLAN.md — Build /games, /games/new, /games/[id]/edit pages, GameForm, DeleteConfirmModal, header nav link, end-to-end checkpoint
 **UI hint**: yes
 
+### Phase 06.1: Game differentiation and sanitization (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 6
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 06.1 to break down)
+
 ### Phase 7: Stats Dashboard
 **Goal**: Users can view visual stats for win rates, screwed rates, game frequency, and participation across all logged games
 **Depends on**: Phase 6

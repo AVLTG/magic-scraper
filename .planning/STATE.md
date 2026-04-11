@@ -75,6 +75,10 @@ None.
 - Phase 9 (401 Games): Cloudflare challenge type unknown — JS challenge may be bypassable via ScraperAPI `render=true`; IP-based block is not. Test with standalone script before planning Phase 9.
 - `prisma migrate deploy` incompatible with Turso — manual schema application required for production
 
+### Roadmap Evolution
+
+- Phase 06.1 inserted after Phase 6: Game differentiation and sanitization (URGENT) — ~20 spreadsheet-ported games need exclusion from combo/deck stats; GameForm needs duplicate-player guard; games list needs winner/player-count/player filters
+
 ## Session Continuity
 
 Last session: 2026-04-11T16:30:00.000Z
