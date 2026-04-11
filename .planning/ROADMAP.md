@@ -67,12 +67,12 @@
 **Goal:** Legacy spreadsheet-imported games are structurally flagged as `isImported` so Phase 7 stats can exclude them from combo/deck metrics; GameForm prevents the same player appearing twice in one game via client-side Combobox exclusion + server-side zod refine; the /games history list gains an inline filter toolbar (winner, player count 2/3/4, players multi-select) with AND-across / OR-within semantics and ephemeral client-side state.
 **Requirements**: GAME-09 (sanitization — closest mapped); other 06.1 work is net-new in v1.1 scope
 **Depends on:** Phase 6
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 06.1-01-import-flag-backfill-PLAN.md — Add isImported Boolean to Game model, prisma db push to dev, generate and human-apply production ALTER + backfill UPDATE via turso db shell, update SCHEMA.md
-- [ ] 06.1-02-duplicate-player-prevention-PLAN.md — Extend Combobox with excludeItems prop + disabled 'Player already in game' collision row, wire excludeItemsForRow into GameForm, add gameSchema.participants.refine for case-insensitive duplicate rejection
-- [ ] 06.1-03-games-filter-toolbar-PLAN.md — Add inline filter toolbar (winner dropdown, player count 2/3/4, players multi-select) above /games table with useMemo-derived filteredGames, Clear filters button, and distinct empty-state messages
+- [x] 06.1-01-import-flag-backfill-PLAN.md — Add isImported Boolean to Game model, prisma db push to dev, generate and human-apply production ALTER + backfill UPDATE via turso db shell, update SCHEMA.md
+- [x] 06.1-02-duplicate-player-prevention-PLAN.md — Extend Combobox with excludeItems prop + disabled 'Player already in game' collision row, wire excludeItemsForRow into GameForm, add gameSchema.participants.refine for case-insensitive duplicate rejection
+- [x] 06.1-03-games-filter-toolbar-PLAN.md — Add inline filter toolbar (winner dropdown, player count 2/3/4, players multi-select) above /games table with useMemo-derived filteredGames, Clear filters button, and distinct empty-state messages
 
 ### Phase 7: Stats Dashboard
 **Goal**: Users can view visual stats for win rates, screwed rates, game frequency, and participation across all logged games
