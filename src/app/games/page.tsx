@@ -21,6 +21,64 @@ interface Game {
   participants: Participant[];
 }
 
+// Phase 6.1 filter toolbar (D-16 through D-23)
+
+// Export the existing interfaces so tests and (potentially) sibling modules can import them.
+export type { Participant, Game };
+
+export interface FilterState {
+  winner: string | null;
+  playerCount: 2 | 3 | 4 | null;
+  players: string[];
+}
+
+/**
+ * Phase 6.1 D-17: AND across filter types, OR within the multi-select.
+ * Returns true when ALL active (non-null, non-empty) filter types pass for the game.
+ * An empty filter state (no active filters) returns true — empty = show everything.
+ */
+export function matchesAllFilters(game: Game, filters: FilterState): boolean {
+  if (filters.winner !== null) {
+    const winner = game.participants.find((p) => p.isWinner);
+    if (!winner || winner.playerName !== filters.winner) return false;
+  }
+  if (filters.playerCount !== null) {
+    if (game.participants.length !== filters.playerCount) return false;
+  }
+  if (filters.players.length > 0) {
+    const names = new Set(game.participants.map((p) => p.playerName));
+    const anyMatch = filters.players.some((p) => names.has(p));
+    if (!anyMatch) return false;
+  }
+  return true;
+}
+
+/**
+ * Phase 6.1 D-19: distinct winner names from currently-loaded games, alphabetized case-insensitive.
+ */
+export function deriveWinnerOptions(games: Game[]): string[] {
+  const set = new Set<string>();
+  for (const g of games) {
+    for (const p of g.participants) {
+      if (p.isWinner) set.add(p.playerName);
+    }
+  }
+  return Array.from(set).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+
+/**
+ * Phase 6.1 D-20: distinct participant names (winners + non-winners) from currently-loaded games, alphabetized.
+ */
+export function derivePlayerOptions(games: Game[]): string[] {
+  const set = new Set<string>();
+  for (const g of games) {
+    for (const p of g.participants) {
+      set.add(p.playerName);
+    }
+  }
+  return Array.from(set).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+
 function formatDate(iso: string): string {
   try {
     // Game dates are stored as UTC midnight of the chosen calendar day
