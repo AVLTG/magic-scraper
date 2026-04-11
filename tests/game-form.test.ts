@@ -1,4 +1,5 @@
 import {
+  excludeItemsForRow,
   filterEmptyRows,
   validateGameForm,
 } from '../src/app/games/game-form';
@@ -157,5 +158,56 @@ describe('validateGameForm', () => {
       expect(result.payload.participants[0].isWinner).toBe(true);
       expect(result.payload.participants[1].isWinner).toBe(false);
     }
+  });
+});
+
+describe('excludeItemsForRow (D-10, D-11)', () => {
+  function stateOf(names: string[]): {
+    date: string;
+    notes: string;
+    wonByCombo: boolean;
+    rows: ParticipantRow[];
+    winnerIndex: number;
+  } {
+    const rows: ParticipantRow[] = [0, 1, 2, 3].map((i) => ({
+      playerName: names[i] ?? '',
+      deckName: '',
+      isWinner: false,
+      isScrewed: false,
+    }));
+    return { date: '2026-04-10', notes: '', wonByCombo: false, rows, winnerIndex: -1 };
+  }
+
+  it('returns all other filled rows for row 0', () => {
+    expect(excludeItemsForRow(0, stateOf(['A', 'B', '', '']))).toEqual(['B']);
+  });
+
+  it('returns the other filled row for row 1', () => {
+    expect(excludeItemsForRow(1, stateOf(['A', 'B', '', '']))).toEqual(['A']);
+  });
+
+  it('returns both filled rows for an empty row 2', () => {
+    expect(excludeItemsForRow(2, stateOf(['A', 'B', '', '']))).toEqual(['A', 'B']);
+  });
+
+  it('returns empty array when all rows are empty', () => {
+    expect(excludeItemsForRow(0, stateOf([]))).toEqual([]);
+  });
+
+  it('treats whitespace-only rows as empty', () => {
+    expect(excludeItemsForRow(0, stateOf(['', '   ', 'Carol', '']))).toEqual(['Carol']);
+  });
+
+  it('trims leading/trailing whitespace from included names', () => {
+    expect(excludeItemsForRow(0, stateOf(['', '  Bob  ', '', '']))).toEqual(['Bob']);
+  });
+
+  it("does NOT include the caller row's own name (D-11 — row sees its own value)", () => {
+    // Row 0 is 'A'; excludeItemsForRow(0, ...) must NOT include 'A' — only the OTHER rows' names.
+    expect(excludeItemsForRow(0, stateOf(['A', 'B', 'C', '']))).toEqual(['B', 'C']);
+  });
+
+  it('handles 4-row full state for row 3', () => {
+    expect(excludeItemsForRow(3, stateOf(['A', 'B', 'C', 'D']))).toEqual(['A', 'B', 'C']);
   });
 });

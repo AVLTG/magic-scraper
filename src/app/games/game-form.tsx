@@ -44,6 +44,26 @@ export function filterEmptyRows(rows: ParticipantRow[]): ParticipantRow[] {
   return rows.filter((r) => r.playerName.trim() !== '');
 }
 
+/**
+ * Phase 6.1 D-10, D-11: derive the list of already-filled player names from all rows
+ * EXCEPT the caller's own row. Used to populate the `excludeItems` prop on each row's
+ * player-name Combobox so the dropdown hides names already in use by other participants.
+ *
+ * - Row's own current value is NOT included (D-11 — editing a filled row shouldn't hide
+ *   the player from themselves)
+ * - Whitespace-only names are treated as empty
+ * - Names are trimmed before inclusion
+ */
+export function excludeItemsForRow(
+  rowIndex: number,
+  state: { rows: ParticipantRow[] }
+): string[] {
+  return state.rows
+    .map((r, i) => ({ name: r.playerName.trim(), i }))
+    .filter((r) => r.i !== rowIndex && r.name.length > 0)
+    .map((r) => r.name);
+}
+
 /** Pure helper: validate form state and return either an error map or a ready-to-POST payload. */
 export function validateGameForm(state: GameFormState): ValidationResult {
   const errors: GameFormErrors = {};
@@ -269,6 +289,8 @@ export function GameForm({ initial, submitLabel = 'Save game', onSubmit }: GameF
               onChange={(v) => updateRow(i, { playerName: v })}
               placeholder={`Player ${i + 1}`}
               addLabel="player"
+              excludeItems={excludeItemsForRow(i, state)}
+              excludeLabel="Player already in game"
             />
             <Combobox
               items={deckItems}
