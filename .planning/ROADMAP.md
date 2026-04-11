@@ -59,7 +59,7 @@
 - [x] 06-03-autocomplete-api-PLAN.md — Create GET /api/players (union of Moxfield users + participant history) and GET /api/decks autocomplete routes with rate limiting
 - [x] 06-04-games-api-PLAN.md — Create /api/games POST+GET and /api/games/[id] GET+PATCH+DELETE using gameSchema.parse and $transaction, with full integration tests
 - [x] 06-05-scraper-rate-limit-PLAN.md — Apply tighter 10/60s rate limit to existing /api/checkDeck and /api/scrapeLGS routes (additive edit, no behavior change)
-- [ ] 06-06-games-pages-PLAN.md — Build /games, /games/new, /games/[id]/edit pages, GameForm, DeleteConfirmModal, header nav link, end-to-end checkpoint
+- [x] 06-06-games-pages-PLAN.md — Build /games, /games/new, /games/[id]/edit pages, GameForm, DeleteConfirmModal, header nav link, end-to-end checkpoint
 **UI hint**: yes
 
 ### Phase 7: Stats Dashboard
