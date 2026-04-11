@@ -57,6 +57,88 @@ import {
   PATCH as patchGame,
   DELETE as deleteGame,
 } from '../src/app/api/games/[id]/route';
+import { gameSchema } from '../src/lib/validators';
+
+describe('gameSchema duplicate-participant refine (D-14)', () => {
+  const baseValid = {
+    date: '2026-04-10',
+    wonByCombo: false,
+    notes: undefined,
+  };
+
+  it('accepts distinct player names', () => {
+    const result = gameSchema.safeParse({
+      ...baseValid,
+      participants: [
+        { playerName: 'Amirali', isWinner: true, isScrewed: false },
+        { playerName: 'Bob', isWinner: false, isScrewed: false },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects identical duplicate player names', () => {
+    const result = gameSchema.safeParse({
+      ...baseValid,
+      participants: [
+        { playerName: 'Amirali', isWinner: true, isScrewed: false },
+        { playerName: 'Amirali', isWinner: false, isScrewed: false },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const messages = result.error.issues.map((i) => i.message);
+      expect(messages).toContain('duplicate player names not allowed');
+    }
+  });
+
+  it('rejects case-insensitive duplicate player names', () => {
+    const result = gameSchema.safeParse({
+      ...baseValid,
+      participants: [
+        { playerName: 'Amirali', isWinner: true, isScrewed: false },
+        { playerName: 'amirali', isWinner: false, isScrewed: false },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const messages = result.error.issues.map((i) => i.message);
+      expect(messages).toContain('duplicate player names not allowed');
+    }
+  });
+
+  it('treats whitespace-trimmed names as duplicates (relies on gameParticipantSchema.trim)', () => {
+    const result = gameSchema.safeParse({
+      ...baseValid,
+      participants: [
+        { playerName: 'Amirali', isWinner: true, isScrewed: false },
+        { playerName: '  Amirali  ', isWinner: false, isScrewed: false },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts single participant', () => {
+    const result = gameSchema.safeParse({
+      ...baseValid,
+      participants: [{ playerName: 'Solo', isWinner: true, isScrewed: false }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects 4 participants with one duplicate', () => {
+    const result = gameSchema.safeParse({
+      ...baseValid,
+      participants: [
+        { playerName: 'A', isWinner: true, isScrewed: false },
+        { playerName: 'B', isWinner: false, isScrewed: false },
+        { playerName: 'C', isWinner: false, isScrewed: false },
+        { playerName: 'a', isWinner: false, isScrewed: false },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+});
 
 function makeRequest(body?: unknown): Request {
   return {
