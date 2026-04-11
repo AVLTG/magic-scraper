@@ -2,9 +2,15 @@
 import { useState, useRef, useEffect, useId, KeyboardEvent } from 'react';
 
 // Pure helpers (exported for unit tests)
-export function filterItems(items: string[], inputValue: string): string[] {
+export function filterItems(items: string[], inputValue: string, excludeItems?: string[]): string[] {
   const q = inputValue.toLowerCase();
-  return items.filter((i) => i.toLowerCase().includes(q));
+  const excluded = new Set(
+    (excludeItems ?? []).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 0)
+  );
+  return items.filter((i) => {
+    if (excluded.has(i.toLowerCase())) return false;
+    return i.toLowerCase().includes(q);
+  });
 }
 
 export function shouldShowAddNew(items: string[], inputValue: string): boolean {
@@ -14,6 +20,23 @@ export function shouldShowAddNew(items: string[], inputValue: string): boolean {
   return !items.some((i) => i.toLowerCase() === lower);
 }
 
+// Phase 6.1 D-12: when the user types a name that collides with an already-filled
+// participant row, the Combobox swaps the "Add xyz as new player" affordance for a
+// disabled, non-clickable row reading "Player already in game". This helper detects
+// the collision state. Returns true ONLY when the typed input case-insensitively
+// equals one of the excluded items (not on partial matches — partial matches should
+// still allow the normal "Add new" affordance so the user can commit a fresh name).
+export function shouldShowExcludedNotice(
+  excludeItems: string[] | undefined,
+  inputValue: string
+): boolean {
+  const trimmed = inputValue.trim();
+  if (trimmed.length === 0) return false;
+  if (!excludeItems || excludeItems.length === 0) return false;
+  const lower = trimmed.toLowerCase();
+  return excludeItems.some((x) => x.trim().toLowerCase() === lower);
+}
+
 export interface ComboboxProps {
   items: string[];
   value: string;
@@ -21,9 +44,20 @@ export interface ComboboxProps {
   placeholder?: string;
   addLabel?: string;
   id?: string;
+  excludeItems?: string[];      // Phase 6.1 D-10 — items to filter OUT of the dropdown
+  excludeLabel?: string;         // Phase 6.1 D-12 — text for the disabled collision row. Defaults to "Player already in game".
 }
 
-export function Combobox({ items, value, onChange, placeholder, addLabel = 'item', id }: ComboboxProps) {
+export function Combobox({
+  items,
+  value,
+  onChange,
+  placeholder,
+  addLabel = 'item',
+  id,
+  excludeItems,
+  excludeLabel = 'Player already in game',
+}: ComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -47,10 +81,14 @@ export function Combobox({ items, value, onChange, placeholder, addLabel = 'item
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, [isOpen]);
 
-  const filtered = filterItems(items, inputValue);
-  const showAddNew = shouldShowAddNew(items, inputValue);
-  const totalRows = filtered.length + (showAddNew ? 1 : 0);
-  const addNewIndex = filtered.length;
+  const filtered = filterItems(items, inputValue, excludeItems);
+  const showExcluded = shouldShowExcludedNotice(excludeItems, inputValue);
+  // D-12: the "Add new" affordance is suppressed whenever the collision notice is shown.
+  // They are mutually exclusive — either you see "Add xyz as new" OR "Player already in game", never both.
+  const showAddNew = !showExcluded && shouldShowAddNew(items, inputValue);
+  const totalRows = filtered.length + (showAddNew ? 1 : 0) + (showExcluded ? 1 : 0);
+  const addNewIndex = filtered.length;                          // only valid when showAddNew is true
+  const excludedNoticeIndex = filtered.length;                  // same index as addNewIndex because they are mutually exclusive
 
   const commit = (val: string) => {
     onChange(val);
@@ -62,23 +100,30 @@ export function Combobox({ items, value, onChange, placeholder, addLabel = 'item
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      // Highlightable count excludes the disabled notice row (D-12 — keyboard skips it)
+      const highlightable = showExcluded ? filtered.length : totalRows;
+      if (highlightable <= 0) return;
       if (!isOpen) {
         setIsOpen(true);
         setHighlightedIndex(0);
         return;
       }
-      setHighlightedIndex((prev) => (prev + 1) % Math.max(totalRows, 1));
+      setHighlightedIndex((prev) => (prev + 1) % highlightable);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      const highlightable = showExcluded ? filtered.length : totalRows;
+      if (highlightable <= 0) return;
       if (!isOpen) {
         setIsOpen(true);
-        setHighlightedIndex(Math.max(totalRows - 1, 0));
+        setHighlightedIndex(Math.max(highlightable - 1, 0));
         return;
       }
-      setHighlightedIndex((prev) => (prev - 1 + Math.max(totalRows, 1)) % Math.max(totalRows, 1));
+      setHighlightedIndex((prev) => (prev - 1 + highlightable) % highlightable);
     } else if (e.key === 'Enter') {
       if (!isOpen || highlightedIndex < 0) return;
       e.preventDefault();
+      // Enter on the excluded-notice row is a no-op (D-12 — non-clickable)
+      if (showExcluded && highlightedIndex === excludedNoticeIndex) return;
       if (highlightedIndex === addNewIndex && showAddNew) {
         commit(inputValue.trim());
       } else if (highlightedIndex < filtered.length) {
@@ -96,7 +141,8 @@ export function Combobox({ items, value, onChange, placeholder, addLabel = 'item
       setHighlightedIndex(0);
     } else if (e.key === 'End' && isOpen) {
       e.preventDefault();
-      setHighlightedIndex(Math.max(totalRows - 1, 0));
+      const highlightable = showExcluded ? filtered.length : totalRows;
+      setHighlightedIndex(Math.max(highlightable - 1, 0));
     }
   };
 
@@ -165,6 +211,19 @@ export function Combobox({ items, value, onChange, placeholder, addLabel = 'item
               }`}
             >
               + Add &quot;{inputValue.trim()}&quot; as new {addLabel}
+            </li>
+          )}
+          {showExcluded && (
+            <li
+              key="__excluded__"
+              id={`${listboxId}-opt-${excludedNoticeIndex}`}
+              role="option"
+              aria-disabled="true"
+              aria-selected={false}
+              // No onMouseDown — non-clickable per D-12
+              className="px-3 py-2 border-t border-border italic text-muted opacity-60 cursor-not-allowed select-none"
+            >
+              {excludeLabel}
             </li>
           )}
         </ul>

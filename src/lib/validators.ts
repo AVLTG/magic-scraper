@@ -41,10 +41,19 @@ export const gameSchema = z.object({
     .max(1000, "notes too long")
     .optional()
     .transform((v) => (v === "" ? undefined : v)),
+  // Phase 6.1 D-14: defense-in-depth against duplicate player names within a single
+  // game. Client-side Combobox + excludeItems prevents the UX from producing duplicates
+  // (game-form.tsx), but the API must reject any direct POST/PATCH bypassing the form.
+  // Case-insensitive comparison — gameParticipantSchema.playerName already .trim()s, so
+  // leading/trailing whitespace collisions are normalized before this refine runs.
   participants: z
     .array(gameParticipantSchema)
     .min(1, "at least one participant required")
-    .max(4, "at most four participants per game"),
+    .max(4, "at most four participants per game")
+    .refine(
+      (arr) => new Set(arr.map((p) => p.playerName.toLowerCase())).size === arr.length,
+      { message: "duplicate player names not allowed" }
+    ),
 });
 
 export type GameInput = z.infer<typeof gameSchema>;
