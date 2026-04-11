@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseDeckList } from '@/lib/parseDeck';
+import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
 
 export async function POST(request: Request) {
+  const rl = checkRateLimit(getIpKey(request), 10, 60000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } }
+    );
+  }
   try {
     const { decklist } = await request.json();
     

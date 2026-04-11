@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { scrapeAllSites } from "@/lib/scrapeLGS/scrapeAllSites";
 import { getCached, setCache } from "@/lib/scrapeLGS/lgsCache";
+import { checkRateLimit, getIpKey } from "@/lib/rateLimit";
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  const rl = checkRateLimit(getIpKey(request), 10, 60000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
   try {
     const body = await request.json();
     const card = typeof body.card === "string" ? body.card.trim() : "";
