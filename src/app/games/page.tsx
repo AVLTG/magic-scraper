@@ -23,10 +23,16 @@ interface Game {
 
 function formatDate(iso: string): string {
   try {
+    // Game dates are stored as UTC midnight of the chosen calendar day
+    // (see game-form.tsx: new Date(state.date).toISOString()). Render in
+    // UTC so the list display matches the stored calendar date rather
+    // than converting to the viewer's local timezone, which would shift
+    // the display by one day for any viewer west of UTC.
     return new Date(iso).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+      timeZone: 'UTC',
     });
   } catch {
     return iso;
