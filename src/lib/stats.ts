@@ -304,14 +304,15 @@ export function computeGamesByDeckPie(
  */
 export function computePlayerRadar(
   games: Game[]
-): { player: string; played: number; wins: number; screwed: number; wonByCombo: number; totalGames: number }[] {
+): { player: string; played: number; wins: number; screwed: number; wonByCombo: number; nonImportedPlayed: number; totalGames: number }[] {
   const totalGames = games.length;
-  const map = new Map<string, { played: number; wins: number; screwed: number; wonByCombo: number }>();
+  const map = new Map<string, { played: number; wins: number; screwed: number; wonByCombo: number; nonImportedPlayed: number }>();
 
   for (const g of games) {
     for (const p of g.participants) {
-      const entry = map.get(p.playerName) ?? { played: 0, wins: 0, screwed: 0, wonByCombo: 0 };
+      const entry = map.get(p.playerName) ?? { played: 0, wins: 0, screwed: 0, wonByCombo: 0, nonImportedPlayed: 0 };
       entry.played++;
+      if (!g.isImported) entry.nonImportedPlayed++;
       if (p.isWinner) entry.wins++;
       if (p.isScrewed) entry.screwed++;
       if (p.isWinner && g.wonByCombo && !g.isImported) entry.wonByCombo++;

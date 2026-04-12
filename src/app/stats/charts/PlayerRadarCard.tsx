@@ -25,6 +25,7 @@ interface PlayerRadarDatum {
   wins: number;
   screwed: number;
   wonByCombo: number;
+  nonImportedPlayed: number;
   totalGames: number;
 }
 
@@ -49,8 +50,11 @@ export default function PlayerRadarCard({ data, chartTokens }: Props) {
       if (axis === "Played") {
         // Participation rate: games played / total games
         row[d.player] = d.totalGames > 0 ? d.played / d.totalGames : 0;
+      } else if (axis === "Won by Combo") {
+        // Combo win rate: count / non-imported games played
+        row[d.player] = d.nonImportedPlayed > 0 ? d.wonByCombo / d.nonImportedPlayed : 0;
       } else {
-        // Win rate, screwed rate, combo win rate: count / games played
+        // Win rate, screwed rate: count / games played
         const key = AXIS_KEYS[axis];
         const raw = d[key] as number;
         row[d.player] = d.played > 0 ? raw / d.played : 0;
