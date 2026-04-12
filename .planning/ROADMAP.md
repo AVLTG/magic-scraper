@@ -84,7 +84,10 @@ Plans:
   3. User can view pie chart breakdowns of wins by player and games by deck
   4. Stats update immediately after a new game is submitted without a full page reload
   5. Players and decks with zero relevant games are not shown in any chart
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 07-01-PLAN.md — Install Recharts, create 9 pure stat computation helpers in src/lib/stats.ts with comprehensive unit tests
+- [ ] 07-02-PLAN.md — Create /stats page shell (fetch, state, mobile expand, layout) and add Stats nav link to header
+- [ ] 07-03-PLAN.md — Create 7 Recharts chart wrapper components (radar, bars, pies, line, bump) under src/app/stats/charts/
 **UI hint**: yes
 
 ### Phase 8: Admin Improvements
@@ -119,6 +122,6 @@ Plans:
 | 4. Automation and Deployment | v1.0 | 3/3 | Complete | 2026-03-17 |
 | 5. Schema Migration & Foundation | v1.1 | 0/3 | Planned | - |
 | 6. Game Tracking Core | v1.1 | 0/? | Not started | - |
-| 7. Stats Dashboard | v1.1 | 0/? | Not started | - |
+| 7. Stats Dashboard | v1.1 | 0/3 | Planned | - |
 | 8. Admin Improvements | v1.1 | 0/? | Not started | - |
 | 9. Scraper Hardening | v1.1 | 0/? | Not started | - |

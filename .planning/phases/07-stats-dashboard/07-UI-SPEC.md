@@ -54,7 +54,7 @@ Source: existing `/games` page + `globals.css` (h1/h2/h3 inherit `font-bold trac
 | Role | Size | Weight | Line Height | Tailwind Class | Usage |
 |------|------|--------|-------------|----------------|-------|
 | Body | 14px | 400 (regular) | 1.5 | `text-sm` | Chart axis labels, tooltip text, table cells, summary card body |
-| Label | 12px | 500 (medium) | 1.4 | `text-xs font-medium` | Chart legend items, section sub-labels, mobile card summary line |
+| Label | 12px | 400 (regular) | 1.4 | `text-xs` | Chart legend items, section sub-labels, mobile card summary line |
 | Heading | 20px | 700 (bold) | 1.2 | `text-xl font-bold tracking-tight` | Section headings (Player Overview, Win Rates, Breakdowns, Frequency) |
 | Display | 24px | 700 (bold) | 1.2 | `text-2xl font-bold` | Page title "Stats" — matches existing `/games` page `<h1>` |
 
@@ -197,12 +197,12 @@ Each individual chart is wrapped in a card:
 
 ```html
 <div class="rounded-lg border border-border bg-surface p-4 mb-6">
-  <h3 class="text-sm font-medium text-muted mb-4">{Chart Title}</h3>
+  <h3 class="text-sm text-muted mb-4">{Chart Title}</h3>
   <!-- Recharts ResponsiveContainer -->
 </div>
 ```
 
-Chart title (`<h3>`) uses `text-sm font-medium text-muted` — subordinate to the section heading, descriptive not decorative.
+Chart title (`<h3>`) uses `text-sm text-muted` — subordinate to the section heading, descriptive not decorative.
 
 ### Section — "Player Overview"
 
@@ -266,7 +266,7 @@ const CHART_IDS = {
     onClick="toggle(id)"
     aria-expanded="{true|false}"
   >
-    <span class="text-sm font-medium text-foreground">{Chart Title}</span>
+    <span class="text-sm font-bold text-foreground">{Chart Title}</span>
     <span class="text-xs text-muted">{Summary Text}</span>
     <ChevronDown class="w-4 h-4 text-muted transition-transform {rotated if expanded}" />
   </button>
