@@ -21,6 +21,7 @@ export default function Header() {
   const navLinks = [
     { href: "/checkDeck", label: "Friend Collections" },
     { href: "/games", label: "Games" },
+    { href: "/stats", label: "Stats" },
     { href: "/SearchLGS", label: "LGS Search" },
   ]
 
