@@ -85,7 +85,7 @@ Plans:
   4. Stats update immediately after a new game is submitted without a full page reload
   5. Players and decks with zero relevant games are not shown in any chart
 **Plans**: 3 plans
-- [ ] 07-01-PLAN.md — Install Recharts, create 9 pure stat computation helpers in src/lib/stats.ts with comprehensive unit tests
+- [x] 07-01-PLAN.md — Install Recharts, create 9 pure stat computation helpers in src/lib/stats.ts with comprehensive unit tests
 - [ ] 07-02-PLAN.md — Create /stats page shell (fetch, state, mobile expand, layout) and add Stats nav link to header
 - [ ] 07-03-PLAN.md — Create 7 Recharts chart wrapper components (radar, bars, pies, line, bump) under src/app/stats/charts/
 **UI hint**: yes
