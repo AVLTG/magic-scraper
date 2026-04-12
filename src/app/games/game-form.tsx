@@ -264,7 +264,7 @@ export function GameForm({ initial, submitLabel = 'Save game', onSubmit }: GameF
             checked={state.wonByCombo}
             onChange={(e) => setState((s) => ({ ...s, wonByCombo: e.target.checked }))}
           />
-          <span className="text-sm text-foreground">Won by combo</span>
+          <span className="text-sm text-foreground"><span className="sm:hidden">Combo Win</span><span className="hidden sm:inline">Won by combo</span></span>
         </label>
       </div>
 
