@@ -248,7 +248,7 @@ export function GameForm({ initial, submitLabel = 'Save game', onSubmit }: GameF
       )}
 
       <div className="flex gap-4 items-end">
-        <div className="flex-1">
+        <div className="w-1/2 sm:flex-1">
           <label className="block text-sm font-medium text-foreground mb-1">Date</label>
           <input
             type="date"
