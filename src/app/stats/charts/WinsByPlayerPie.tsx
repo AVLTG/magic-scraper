@@ -2,10 +2,12 @@
 
 import {
   ResponsiveContainer,
-  PieChart,
-  Pie,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
   Tooltip,
-  Legend,
+  CartesianGrid,
 } from "recharts";
 import { CHART_COLORS } from "../page";
 
@@ -27,42 +29,29 @@ interface Props {
 }
 
 export default function WinsByPlayerPie({ data, chartTokens }: Props) {
-  const coloredData = data.map((d, i) => ({
-    ...d,
-    fill: CHART_COLORS[i % CHART_COLORS.length],
-  }));
-
-  const total = data.reduce((s, d) => s + d.wins, 0);
+  const height = Math.max(200, data.length * 40);
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <PieChart>
-        <Pie
-          data={coloredData}
-          dataKey="wins"
-          nameKey="player"
-          cx="50%"
-          cy="50%"
-          outerRadius={120}
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart layout="vertical" data={data} margin={{ left: 60 }}>
+        <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={chartTokens.border} />
+        <XAxis type="number" tick={{ fontSize: 12, fill: chartTokens.muted }} />
+        <YAxis
+          type="category"
+          dataKey="player"
+          tick={{ fontSize: 12, fill: chartTokens.foreground }}
+          width={60}
         />
         <Tooltip
-          formatter={(value, name) => {
-            const v = Number(value);
-            return [`${v} wins (${total > 0 ? Math.round((v / total) * 100) : 0}%)`, String(name)];
-          }}
+          formatter={(value) => [`${Number(value)} wins`, "Wins"]}
           contentStyle={{
             background: chartTokens.surface,
             border: `1px solid ${chartTokens.border}`,
             color: chartTokens.foreground,
           }}
         />
-        <Legend
-          iconType="circle"
-          formatter={(value: string) => (
-            <span style={{ color: chartTokens.muted }}>{value}</span>
-          )}
-        />
-      </PieChart>
+        <Bar dataKey="wins" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
+      </BarChart>
     </ResponsiveContainer>
   );
 }

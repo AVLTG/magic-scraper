@@ -25,6 +25,7 @@ interface PlayerRadarDatum {
   wins: number;
   screwed: number;
   wonByCombo: number;
+  totalGames: number;
 }
 
 interface Props {
@@ -41,25 +42,24 @@ const AXIS_KEYS: Record<(typeof AXES)[number], keyof PlayerRadarDatum> = {
 };
 
 export default function PlayerRadarCard({ data, chartTokens }: Props) {
-  // Compute per-axis max for normalization
-  const axisMax: Record<string, number> = {};
-  for (const axis of AXES) {
-    const key = AXIS_KEYS[axis];
-    axisMax[axis] = Math.max(...data.map((d) => d[key] as number), 0);
-  }
-
-  // Build radar-format data: one object per axis with each player's normalized value
+  // Build radar-format data: one object per axis with each player's percentage value (0-1)
   const radarData = AXES.map((axis) => {
-    const key = AXIS_KEYS[axis];
     const row: Record<string, string | number> = { axis };
     for (const d of data) {
-      const raw = d[key] as number;
-      row[d.player] = axisMax[axis] > 0 ? raw / axisMax[axis] : 0;
+      if (axis === "Played") {
+        // Participation rate: games played / total games
+        row[d.player] = d.totalGames > 0 ? d.played / d.totalGames : 0;
+      } else {
+        // Win rate, screwed rate, combo win rate: count / games played
+        const key = AXIS_KEYS[axis];
+        const raw = d[key] as number;
+        row[d.player] = d.played > 0 ? raw / d.played : 0;
+      }
     }
     return row;
   });
 
-  // Store raw values for tooltip
+  // Store raw values for tooltip (includes totalGames for percentage calculation)
   const rawByPlayer: Record<string, Record<string, number>> = {};
   for (const d of data) {
     rawByPlayer[d.player] = {
@@ -67,6 +67,7 @@ export default function PlayerRadarCard({ data, chartTokens }: Props) {
       Wins: d.wins,
       Screwed: d.screwed,
       "Won by Combo": d.wonByCombo,
+      totalGames: d.totalGames,
     };
   }
 
@@ -110,12 +111,17 @@ export default function PlayerRadarCard({ data, chartTokens }: Props) {
                 {payload.map((entry) => {
                   const playerName = entry.name as string;
                   const raw = rawByPlayer[playerName]?.[axis] ?? 0;
+                  const played = rawByPlayer[playerName]?.["Played"] ?? 0;
+                  const totalGames = rawByPlayer[playerName]?.["totalGames"] ?? 1;
+                  const pct = axis === "Played"
+                    ? Math.round((raw / totalGames) * 100)
+                    : played > 0 ? Math.round((raw / played) * 100) : 0;
                   return (
                     <div
                       key={playerName}
                       style={{ color: entry.color, marginBottom: 2 }}
                     >
-                      {playerName}: {raw}
+                      {playerName}: {raw} ({pct}%)
                     </div>
                   );
                 })}
