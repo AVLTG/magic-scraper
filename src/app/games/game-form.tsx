@@ -247,8 +247,8 @@ export function GameForm({ initial, submitLabel = 'Save game', onSubmit }: GameF
         </div>
       )}
 
-      <div className="flex gap-4 items-end">
-        <div className="flex-1">
+      <div className="flex gap-4 items-end justify-between">
+        <div className="flex-1 max-w-[50%] sm:max-w-none">
           <label className="block text-sm font-medium text-foreground mb-1">Date</label>
           <input
             type="date"
@@ -258,7 +258,7 @@ export function GameForm({ initial, submitLabel = 'Save game', onSubmit }: GameF
           />
           {errors.date && <p className="text-xs text-red-600 mt-1">{errors.date}</p>}
         </div>
-        <label className="flex items-center gap-2 pb-2">
+        <label className="flex items-center gap-2 pb-2 shrink-0">
           <input
             type="checkbox"
             checked={state.wonByCombo}
