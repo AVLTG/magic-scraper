@@ -23,7 +23,7 @@
 
 - [ ] **Phase 5: Schema Migration & Foundation** - Add Game, GameParticipant, and SyncLog tables to local and production Turso
 - [x] **Phase 6: Game Tracking Core** - Game entry form with autocomplete, CRUD endpoints, game history table, rate limiting
-- [ ] **Phase 7: Stats Dashboard** - Win/screwed rate charts, game frequency, pie charts with Recharts dynamic import
+- [x] **Phase 7: Stats Dashboard** - Win/screwed rate charts, game frequency, pie charts with Recharts dynamic import (completed 2026-04-12)
 - [ ] **Phase 8: Admin Improvements** - Sync history view, inline collection ID edit, cron failure alerting, scraper health dashboard
 - [ ] **Phase 9: Scraper Hardening** - Retry logic, typed errors, 401 Games Cloudflare bypass attempt
 
@@ -87,7 +87,7 @@ Plans:
 **Plans**: 3 plans
 - [x] 07-01-PLAN.md — Install Recharts, create 9 pure stat computation helpers in src/lib/stats.ts with comprehensive unit tests
 - [x] 07-02-PLAN.md — Create /stats page shell (fetch, state, mobile expand, layout) and add Stats nav link to header
-- [ ] 07-03-PLAN.md — Create 7 Recharts chart wrapper components (radar, bars, pies, line, bump) under src/app/stats/charts/
+- [x] 07-03-PLAN.md — Create 7 Recharts chart wrapper components (radar, bars, pies, line, bump) under src/app/stats/charts/
 **UI hint**: yes
 
 ### Phase 8: Admin Improvements
@@ -122,6 +122,6 @@ Plans:
 | 4. Automation and Deployment | v1.0 | 3/3 | Complete | 2026-03-17 |
 | 5. Schema Migration & Foundation | v1.1 | 0/3 | Planned | - |
 | 6. Game Tracking Core | v1.1 | 0/? | Not started | - |
-| 7. Stats Dashboard | v1.1 | 2/3 | In Progress|  |
+| 7. Stats Dashboard | v1.1 | 3/3 | Complete   | 2026-04-12 |
 | 8. Admin Improvements | v1.1 | 0/? | Not started | - |
 | 9. Scraper Hardening | v1.1 | 0/? | Not started | - |
