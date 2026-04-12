@@ -304,7 +304,8 @@ export function computeGamesByDeckPie(
  */
 export function computePlayerRadar(
   games: Game[]
-): { player: string; played: number; wins: number; screwed: number; wonByCombo: number }[] {
+): { player: string; played: number; wins: number; screwed: number; wonByCombo: number; totalGames: number }[] {
+  const totalGames = games.length;
   const map = new Map<string, { played: number; wins: number; screwed: number; wonByCombo: number }>();
 
   for (const g of games) {
@@ -320,5 +321,5 @@ export function computePlayerRadar(
 
   return Array.from(map.entries())
     .filter(([, v]) => v.played > 0)
-    .map(([player, v]) => ({ player, ...v }));
+    .map(([player, v]) => ({ player, ...v, totalGames }));
 }

@@ -123,11 +123,11 @@ export default function StatsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set());
 
-  // ---------- Fetch on mount + refetch on window focus (STAT-07) ----------
+  // ---------- Fetch on mount ----------
   useEffect(() => {
     let cancelled = false;
 
-    async function refetch() {
+    async function fetchData() {
       try {
         setIsLoading(true);
         const res = await fetch('/api/games');
@@ -145,16 +145,10 @@ export default function StatsPage() {
       }
     }
 
-    void refetch();
+    void fetchData();
 
-    function onFocus() {
-      void refetch();
-    }
-
-    window.addEventListener('focus', onFocus);
     return () => {
       cancelled = true;
-      window.removeEventListener('focus', onFocus);
     };
   }, []);
 

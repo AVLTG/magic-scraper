@@ -415,6 +415,17 @@ describe('computePlayerRadar', () => {
     expect(alice.wonByCombo).toBe(1);
   });
 
+  it('includes totalGames equal to games array length', () => {
+    const result = computePlayerRadar(testGames);
+    expect(result[0].totalGames).toBe(testGames.length);
+  });
+
+  it('includes totalGames field for each player', () => {
+    const result = computePlayerRadar(testGames);
+    const alice = result.find((r) => r.player === 'Alice')!;
+    expect(alice.totalGames).toBe(5);
+  });
+
   it('omits players with 0 played', () => {
     const result = computePlayerRadar([]);
     expect(result).toEqual([]);
