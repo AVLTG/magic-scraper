@@ -37,6 +37,9 @@ export default function AdminPage() {
   const [userMessage, setUserMessage] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
+  // Sync summary state (per-user last sync status dot)
+  const [syncSummary, setSyncSummary] = useState<Record<string, { status: string; createdAt: string } | null>>({});
+
   // Scraper health state
   const [storeHealth, setStoreHealth] = useState<Record<string, { status: string; lastRun: string | null; error: string | null }>>({});
   const [expandedStore, setExpandedStore] = useState<string | null>(null);
@@ -49,9 +52,29 @@ export default function AdminPage() {
       .catch(() => {});
   }, []);
 
+  async function fetchSyncSummary(userList: Array<{ id: string }>) {
+    const summaries: Record<string, { status: string; createdAt: string } | null> = {};
+    await Promise.all(
+      userList.map(async (u) => {
+        try {
+          const res = await fetch(`/api/admin/users/${u.id}/sync-logs`);
+          if (res.ok) {
+            const logs = await res.json();
+            summaries[u.id] = logs.length > 0 ? { status: logs[0].status, createdAt: logs[0].createdAt } : null;
+          }
+        } catch { /* ignore — summary is best-effort */ }
+      })
+    );
+    setSyncSummary(summaries);
+  }
+
   async function fetchUsers() {
     const res = await fetch("/api/admin/users");
-    if (res.ok) setUsers(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setUsers(data);
+      fetchSyncSummary(data);
+    }
   }
 
   async function handleDelete(userId: string) {
@@ -139,6 +162,10 @@ export default function AdminPage() {
                 <div className="min-w-0">
                   <span className="font-medium">{user.name}</span>
                   <span className="block sm:inline text-sm text-muted sm:ml-2 font-mono truncate">{user.moxfieldCollectionId}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted">
+                  <StatusDot status={(syncSummary[user.id]?.status as "success" | "failure") ?? "unknown"} />
+                  <span>{syncSummary[user.id] ? relativeTime(syncSummary[user.id]!.createdAt) : "no syncs"}</span>
                 </div>
                 <button
                   onClick={(e) => {
