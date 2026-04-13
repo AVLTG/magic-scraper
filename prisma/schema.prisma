@@ -44,8 +44,9 @@ model Game {
   date         DateTime
   wonByCombo   Boolean             @default(false)
   notes        String?
-  isImported   Boolean             @default(false)
-  createdAt    DateTime            @default(now())
+  isImported        Boolean             @default(false)
+  discordNotified   Boolean             @default(false)
+  createdAt         DateTime            @default(now())
 
   participants GameParticipant[]
 
