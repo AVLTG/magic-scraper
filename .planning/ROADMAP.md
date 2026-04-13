@@ -99,7 +99,10 @@ Plans:
   2. Admin can click to inline-edit any user's Moxfield collection ID and save without a page reload
   3. A Discord webhook message is posted when the nightly cron sync fails, including which user failed and the error
   4. Admin can view a scraper health page showing last-run status (success/failure) and recent log entries for each LGS store
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 08-01-PLAN.md — Schema source column, updateAllCollections SyncLog writes, PATCH endpoint, sync-logs endpoint, Discord webhook utility, cron/manual route updates
+- [ ] 08-02-PLAN.md — Admin page UI: inline collection ID editing, sync status dots, expandable sync history rows
+- [ ] 08-03-PLAN.md — Scraper health cache, scrapeAllSites integration, health API endpoint, admin page health section
 **UI hint**: yes
 
 ### Phase 9: Scraper Hardening
@@ -123,5 +126,5 @@ Plans:
 | 5. Schema Migration & Foundation | v1.1 | 0/3 | Planned | - |
 | 6. Game Tracking Core | v1.1 | 0/? | Not started | - |
 | 7. Stats Dashboard | v1.1 | 3/3 | Complete   | 2026-04-12 |
-| 8. Admin Improvements | v1.1 | 0/? | Not started | - |
+| 8. Admin Improvements | v1.1 | 0/3 | Planned | - |
 | 9. Scraper Hardening | v1.1 | 0/? | Not started | - |
