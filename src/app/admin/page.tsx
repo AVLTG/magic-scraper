@@ -2,6 +2,28 @@
 
 import { useState, useEffect } from "react";
 
+function StatusDot({ status }: { status: "success" | "failure" | "unknown" }) {
+  const color =
+    status === "success"
+      ? "bg-emerald-400"
+      : status === "failure"
+        ? "bg-red-400"
+        : "bg-zinc-500";
+  return <span className={`inline-block w-2 h-2 rounded-full ${color} flex-shrink-0`} />;
+}
+
+function relativeTime(date: Date | string): string {
+  const ms = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+const DISABLED_STORES = new Set(["401 Games"]);
+
 export default function AdminPage() {
   // Existing state for Update All Collections
   const [isUpdating, setIsUpdating] = useState(false);
@@ -15,8 +37,16 @@ export default function AdminPage() {
   const [userMessage, setUserMessage] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
+  // Scraper health state
+  const [storeHealth, setStoreHealth] = useState<Record<string, { status: string; lastRun: string | null; error: string | null }>>({});
+  const [expandedStore, setExpandedStore] = useState<string | null>(null);
+
   useEffect(() => {
     fetchUsers();
+    fetch("/api/admin/scraper-health")
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((data) => setStoreHealth(data))
+      .catch(() => {});
   }, []);
 
   async function fetchUsers() {
@@ -182,6 +212,46 @@ export default function AdminPage() {
             {message}
           </p>
         )}
+      </div>
+
+      {/* Scraper Health section */}
+      <div className="rounded-lg border border-border bg-surface p-6 mt-6">
+        <h2 className="text-lg font-semibold mb-4">Scraper Health</h2>
+        <p className="text-xs text-muted mb-3">Status resets on cold start. Updated when users search for cards.</p>
+        <div className="space-y-1">
+          {Object.entries(storeHealth).length === 0 ? (
+            <p className="text-sm text-muted">No scraper data available.</p>
+          ) : (
+            Object.entries(storeHealth).map(([name, health]) => {
+              const isDisabled = DISABLED_STORES.has(name);
+              const displayStatus = isDisabled ? "unknown" : (health.status as "success" | "failure" | "unknown");
+              const isFailed = !isDisabled && health.status === "failure";
+              return (
+                <div key={name}>
+                  <div
+                    className={`flex items-center gap-2 p-2 rounded ${isFailed ? "cursor-pointer hover:bg-background" : ""}`}
+                    onClick={() => isFailed && setExpandedStore((prev) => (prev === name ? null : name))}
+                  >
+                    <StatusDot status={displayStatus} />
+                    <span className={`text-sm ${isDisabled ? "text-muted line-through" : "text-foreground"}`}>{name}</span>
+                    {isDisabled && <span className="text-xs text-muted">(disabled)</span>}
+                    {health.lastRun && !isDisabled && (
+                      <span className="text-xs text-muted ml-auto">{relativeTime(health.lastRun)}</span>
+                    )}
+                    {isFailed && (
+                      <span className="text-xs text-muted ml-auto">{expandedStore === name ? "▲" : "▼"}</span>
+                    )}
+                  </div>
+                  {expandedStore === name && isFailed && health.error && (
+                    <div className="ml-6 p-2 text-xs text-red-400 bg-red-500/5 rounded">
+                      {health.error.slice(0, 200)}{health.error.length > 200 ? "..." : ""}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
