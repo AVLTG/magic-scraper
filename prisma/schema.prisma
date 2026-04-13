@@ -72,6 +72,7 @@ model SyncLog {
   userId       String
   status       String
   errorMessage String?
+  source       String   @default("cron")
   createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
