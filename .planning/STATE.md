@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-09)
 Phase: 9
 Plan: Not started
 Status: Phase complete
-Last activity: 2026-04-13 - Completed quick task 260413-l2x: Add per-user sync button to admin panel
+Last activity: 2026-04-13 - Completed quick task 260413-ork: Discord webhook notifications for new game creation
 
 Progress: [████████████████████] 100%
 
@@ -84,10 +84,11 @@ None.
 
 ### Quick Tasks Completed
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 260411-wgv | Fix stats: remove auto-refresh, replace pie with bar, fix radar normalization | 2026-04-12 | 6865099 | [260411-wgv](./quick/260411-wgv-fix-stats-dashboard-remove-auto-refresh-/) |
-| 260413-l2x | Add per-user sync button to admin panel | 2026-04-13 | cdfe5dc | Needs Review | [260413-l2x](./quick/260413-l2x-add-per-user-sync-button-to-admin-panel/) |
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260411-wgv | Fix stats: remove auto-refresh, replace pie with bar, fix radar normalization | 2026-04-12 | 6865099 | | [260411-wgv](./quick/260411-wgv-fix-stats-dashboard-remove-auto-refresh-/) |
+| 260413-l2x | Add per-user sync button to admin panel | 2026-04-13 | cdfe5dc | | [260413-l2x](./quick/260413-l2x-add-per-user-sync-button-to-admin-panel/) |
+| 260413-ork | Discord webhook notifications for new game creation | 2026-04-13 | 52da16e | Needs Review | [260413-ork](./quick/260413-ork-discord-webhook-notifications-for-new-ga/) |
 
 ### Roadmap Evolution
 
