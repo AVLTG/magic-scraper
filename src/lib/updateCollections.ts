@@ -32,6 +32,15 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
 
       if (cards.length === 0) {
         console.log('No cards scraped - skipping database update');
+        const zeroCardsMsg = 'No cards scraped';
+        failed.push({ name: user.name, error: zeroCardsMsg });
+        try {
+          await prisma.syncLog.create({
+            data: { userId: user.id, status: 'failure', errorMessage: zeroCardsMsg, source },
+          });
+        } catch (logError) {
+          console.error(`Failed to write SyncLog for ${user.name}:`, logError);
+        }
         continue;
       }
 
