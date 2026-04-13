@@ -191,13 +191,19 @@ export default function AdminPage() {
         method: "POST",
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage("Collections updated successfully!");
-      } else {
-        setMessage(`Error: ${data.error}`);
+      if (!response.ok) {
+        const text = await response.text();
+        try {
+          const data = JSON.parse(text);
+          setMessage(`Error: ${data.error || data.message || "Sync failed"}`);
+        } catch {
+          setMessage(`Error: ${response.status === 504 ? "Sync timed out — try again or check Vercel logs" : `HTTP ${response.status}`}`);
+        }
+        return;
       }
+
+      const data = await response.json();
+      setMessage(data.success ? "Collections updated successfully!" : `Sync completed with errors: ${data.message}`);
     } catch (err) {
       setMessage(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
