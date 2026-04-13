@@ -100,9 +100,9 @@ Plans:
   3. A Discord webhook message is posted when the nightly cron sync fails, including which user failed and the error
   4. Admin can view a scraper health page showing last-run status (success/failure) and recent log entries for each LGS store
 **Plans**: 3 plans
-- [ ] 08-01-PLAN.md — Schema source column, updateAllCollections SyncLog writes, PATCH endpoint, sync-logs endpoint, Discord webhook utility, cron/manual route updates
-- [ ] 08-02-PLAN.md — Admin page UI: inline collection ID editing, sync status dots, expandable sync history rows
-- [ ] 08-03-PLAN.md — Scraper health cache, scrapeAllSites integration, health API endpoint, admin page health section
+- [x] 08-01-PLAN.md — Schema source column, updateAllCollections SyncLog writes, PATCH endpoint, sync-logs endpoint, Discord webhook utility, cron/manual route updates
+- [x] 08-02-PLAN.md — Admin page UI: inline collection ID editing, sync status dots, expandable sync history rows
+- [x] 08-03-PLAN.md — Scraper health cache, scrapeAllSites integration, health API endpoint, admin page health section
 **UI hint**: yes
 
 ### Phase 9: Scraper Hardening
