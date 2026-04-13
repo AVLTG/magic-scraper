@@ -3,14 +3,18 @@
  * Tests sendDiscordAlert: posts to webhook, handles missing URL, handles fetch failures
  */
 
+const originalFetch = global.fetch;
 const mockFetch = jest.fn();
-global.fetch = mockFetch;
+global.fetch = mockFetch as typeof global.fetch;
 
 import { sendDiscordAlert } from '@/lib/discord';
 
 describe('sendDiscordAlert', () => {
   const WEBHOOK_URL = 'https://discord.com/api/webhooks/test/token';
 
+  afterAll(() => {
+    global.fetch = originalFetch;
+  });
   beforeEach(() => {
     mockFetch.mockClear();
     delete process.env.DISCORD_WEBHOOK_URL;
