@@ -51,14 +51,27 @@ export default function AdminPage() {
 
   // Scraper health state
   const [storeHealth, setStoreHealth] = useState<Record<string, { status: string; lastRun: string | null; error: string | null }>>({});
+  const [scraperHealthWarning, setScraperHealthWarning] = useState("");
   const [expandedStore, setExpandedStore] = useState<string | null>(null);
 
   useEffect(() => {
+    async function fetchScraperHealth() {
+      try {
+        setScraperHealthWarning("");
+        const res = await fetch("/api/admin/scraper-health");
+        if (!res.ok) {
+          throw new Error(`Failed to fetch scraper health: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        setStoreHealth(data);
+      } catch (error) {
+        console.error("Failed to load scraper health", error);
+        setScraperHealthWarning("Unable to load scraper health data.");
+      }
+    }
+
     fetchUsers();
-    fetch("/api/admin/scraper-health")
-      .then((res) => (res.ok ? res.json() : {}))
-      .then((data) => setStoreHealth(data))
-      .catch(() => {});
+    fetchScraperHealth();
   }, []);
 
   async function fetchSyncSummary(userList: Array<{ id: string }>) {
