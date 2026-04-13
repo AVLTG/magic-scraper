@@ -114,3 +114,70 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
 
   return { succeeded, failed };
 }
+
+export async function updateUserCollection(
+  userId: string,
+  source: 'cron' | 'manual' = 'manual'
+): Promise<{ success: boolean; error?: string; userName?: string }> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { success: false, error: 'User not found' };
+
+  console.log(`=== Updating collection for ${user.name} ===`);
+  console.log('Collection ID:', user.moxfieldCollectionId);
+
+  try {
+    const cards = await scrapeMoxfield({ collectionId: user.moxfieldCollectionId });
+    console.log(`Scraped ${cards.length} cards for ${user.name}`);
+
+    if (cards.length === 0) {
+      const zeroCardsMsg = 'No cards scraped';
+      try {
+        await prisma.syncLog.create({
+          data: { userId: user.id, status: 'failure', errorMessage: zeroCardsMsg, source },
+        });
+      } catch (logError) {
+        console.error(`Failed to write SyncLog for ${user.name}:`, logError);
+      }
+      return { success: false, error: zeroCardsMsg, userName: user.name };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.collectionCard.deleteMany({ where: { userId: user.id } });
+      await tx.collectionCard.createMany({
+        data: cards.map(card => ({
+          userId: user.id,
+          cardName: card.name,
+          scryfallId: card.scryfall_id,
+          set: card.set,
+          setName: card.set_name,
+          quantity: card.quantity,
+          condition: card.condition,
+          isFoil: card.isFoil,
+          typeLine: card.type_line,
+        })),
+      });
+      await tx.user.update({ where: { id: user.id }, data: { lastUpdated: new Date() } });
+    });
+
+    try {
+      await prisma.syncLog.create({
+        data: { userId: user.id, status: 'success', source },
+      });
+    } catch (logError) {
+      console.error(`Failed to write SyncLog for ${user.name}:`, logError);
+    }
+
+    return { success: true, userName: user.name };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to update ${user.name}: ${msg}`);
+    try {
+      await prisma.syncLog.create({
+        data: { userId: user.id, status: 'failure', errorMessage: msg.slice(0, 500), source },
+      });
+    } catch (logError) {
+      console.error(`Failed to write SyncLog for ${user.name}:`, logError);
+    }
+    return { success: false, error: msg, userName: user.name };
+  }
+}
