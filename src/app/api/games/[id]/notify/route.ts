@@ -36,7 +36,8 @@ export async function POST(
     const winnerName = winner?.playerName ?? 'Someone';
     const deckDisplay = winner?.deckName ?? 'a deck they forgot to list';
     const comboText = game.wonByCombo ? 'via combo' : 'without any combos';
-    const message = `New game added! ${winnerName} won using ${deckDisplay} ${comboText}. Check it out at magic-scraper.avltg.dev/games`;
+    const origin = new URL(request.url).origin;
+    const message = `New game added! ${winnerName} won using ${deckDisplay} ${comboText}. Check it out at ${origin}/games`;
 
     await sendDiscordAlert({ content: message });
     await prisma.game.update({

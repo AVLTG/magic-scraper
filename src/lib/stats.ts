@@ -103,7 +103,7 @@ export function computeDeckWinRate(
     }
   }
 
-  return Array.from(deckPlayed.entries())
+  const all = Array.from(deckPlayed.entries())
     .filter(([, gameIds]) => gameIds.size > 0)
     .map(([deck, gameIds]) => {
       const played = gameIds.size;
@@ -111,6 +111,17 @@ export function computeDeckWinRate(
       return { deck, wins, played, rate: wins / played };
     })
     .sort((a, b) => b.rate - a.rate);
+
+  if (all.length <= 14) return all;
+
+  const top = all.slice(0, 14);
+  const rest = all.slice(14);
+  const otherWins = rest.reduce((s, d) => s + d.wins, 0);
+  const otherPlayed = rest.reduce((s, d) => s + d.played, 0);
+  return [
+    ...top,
+    { deck: 'Other', wins: otherWins, played: otherPlayed, rate: otherPlayed > 0 ? otherWins / otherPlayed : 0 },
+  ];
 }
 
 /**
@@ -291,10 +302,17 @@ export function computeGamesByDeckPie(
       map.set(deck, (map.get(deck) ?? 0) + 1);
     }
   }
-  return Array.from(map.entries())
+  const all = Array.from(map.entries())
     .filter(([, count]) => count > 0)
     .map(([deck, count]) => ({ deck, games: count }))
     .sort((a, b) => b.games - a.games);
+
+  if (all.length <= 14) return all;
+
+  const top = all.slice(0, 14);
+  const rest = all.slice(14);
+  const otherGames = rest.reduce((s, d) => s + d.games, 0);
+  return [...top, { deck: 'Other', games: otherGames }];
 }
 
 /**

@@ -66,8 +66,8 @@ export default function GamesByDeckPie({ data, chartTokens }: Props) {
           />
         </PieChart>
       </ResponsiveContainer>
-      {data.length > 20 && (
-        <p className="text-xs text-muted mt-2">Showing top 20 decks</p>
+      {data.some((d) => d.deck === 'Other') && (
+        <p className="text-xs text-muted mt-2">Showing top 14 decks; remaining grouped as &quot;Other&quot;</p>
       )}
     </>
   );

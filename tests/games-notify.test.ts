@@ -46,6 +46,7 @@ import { POST } from '../src/app/api/games/[id]/notify/route';
 
 function makeRequest(): Request {
   return {
+    url: 'http://localhost:3000/api/games/g1/notify',
     headers: { get: (_name: string) => null },
     json: async () => ({}),
   } as unknown as Request;
@@ -121,7 +122,7 @@ describe('POST /api/games/[id]/notify', () => {
     expect(res.body).toEqual({ success: true });
     expect(mockSendDiscordAlert).toHaveBeenCalledWith({
       content:
-        'New game added! Alice won using Atraxa via combo. Check it out at magic-scraper.avltg.dev/games',
+        'New game added! Alice won using Atraxa via combo. Check it out at http://localhost:3000/games',
     });
     expect(mockGameUpdate).toHaveBeenCalledWith({
       where: { id: 'g1' },
@@ -149,7 +150,7 @@ describe('POST /api/games/[id]/notify', () => {
     expect(res.status).toBe(200);
     expect(mockSendDiscordAlert).toHaveBeenCalledWith({
       content:
-        'New game added! Alice won using a deck they forgot to list without any combos. Check it out at magic-scraper.avltg.dev/games',
+        'New game added! Alice won using a deck they forgot to list without any combos. Check it out at http://localhost:3000/games',
     });
   });
 
@@ -161,7 +162,7 @@ describe('POST /api/games/[id]/notify', () => {
     expect(res.status).toBe(200);
     expect(mockSendDiscordAlert).toHaveBeenCalledWith({
       content:
-        'New game added! Alice won using Atraxa without any combos. Check it out at magic-scraper.avltg.dev/games',
+        'New game added! Alice won using Atraxa without any combos. Check it out at http://localhost:3000/games',
     });
   });
 

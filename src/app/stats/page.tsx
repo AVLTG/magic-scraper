@@ -60,6 +60,7 @@ function ChartSection({
   id,
   title,
   summary,
+  description,
   children,
   expanded,
   onToggle,
@@ -67,6 +68,7 @@ function ChartSection({
   id: string;
   title: string;
   summary: string;
+  description?: string;
   children: ReactNode;
   expanded: boolean;
   onToggle: () => void;
@@ -89,6 +91,7 @@ function ChartSection({
         </button>
         {expanded && (
           <div id={`chart-${id}`} className="px-4 pb-4">
+            {description && <p className="text-xs text-muted mb-3">{description}</p>}
             {children}
           </div>
         )}
@@ -96,7 +99,9 @@ function ChartSection({
 
       {/* Desktop: always visible card */}
       <div className="hidden sm:block rounded-lg border border-border bg-surface p-4 mb-6">
-        <h3 className="text-sm text-muted mb-4">{title}</h3>
+        <h3 className="text-sm text-muted mb-1">{title}</h3>
+        {description && <p className="text-xs text-muted mb-4">{description}</p>}
+        {!description && <div className="mb-3" />}
         {children}
       </div>
     </>
@@ -265,6 +270,7 @@ export default function StatsPage() {
             <ChartSection
               id={CHART_IDS.RADAR}
               title="Player overview by stat"
+              description="Won by combo, wins, and screwed are out of games played. Games played is out of all games."
               summary={getSummary(CHART_IDS.RADAR)}
               expanded={expandedCharts.has(CHART_IDS.RADAR)}
               onToggle={() => toggleChart(CHART_IDS.RADAR)}
