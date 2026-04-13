@@ -49,6 +49,9 @@ export default function AdminPage() {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [syncLogs, setSyncLogs] = useState<Record<string, Array<{ id: string; status: string; errorMessage: string | null; source: string; createdAt: string }>>>({});
 
+  // Per-user sync in-flight state
+  const [syncingUsers, setSyncingUsers] = useState<Record<string, boolean>>({});
+
   // Scraper health state
   const [storeHealth, setStoreHealth] = useState<Record<string, { status: string; lastRun: string | null; error: string | null }>>({});
   const [scraperHealthWarning, setScraperHealthWarning] = useState("");
@@ -182,6 +185,23 @@ export default function AdminPage() {
     }
   }
 
+  async function handleSyncUser(userId: string) {
+    setSyncingUsers(prev => ({ ...prev, [userId]: true }));
+    try {
+      await fetch(`/api/admin/users/${userId}/sync`, { method: "POST" });
+    } finally {
+      setSyncingUsers(prev => ({ ...prev, [userId]: false }));
+      // Refresh the status dot for this user only
+      fetchSyncSummary([{ id: userId }]);
+      // Invalidate cached sync logs so next expand re-fetches fresh data
+      setSyncLogs(prev => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+    }
+  }
+
   const handleUpdate = async () => {
     setIsUpdating(true);
     setMessage("Updating collections...");
@@ -266,6 +286,16 @@ export default function AdminPage() {
                       <StatusDot status={(syncSummary[user.id]?.status as "success" | "failure") ?? "unknown"} />
                       <span>{syncSummary[user.id] ? relativeTime(syncSummary[user.id]!.createdAt) : "no syncs"}</span>
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSyncUser(user.id);
+                      }}
+                      disabled={syncingUsers[user.id] ?? false}
+                      className="flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {syncingUsers[user.id] ? "Syncing..." : "Sync"}
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
