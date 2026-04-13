@@ -2,6 +2,28 @@
 
 import { useState, useEffect } from "react";
 
+function StatusDot({ status }: { status: "success" | "failure" | "unknown" }) {
+  const color =
+    status === "success"
+      ? "bg-emerald-400"
+      : status === "failure"
+        ? "bg-red-400"
+        : "bg-zinc-500";
+  return <span className={`inline-block w-2 h-2 rounded-full ${color} flex-shrink-0`} />;
+}
+
+function relativeTime(date: Date | string): string {
+  const ms = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+const DISABLED_STORES = new Set(["401 Games"]);
+
 export default function AdminPage() {
   // Existing state for Update All Collections
   const [isUpdating, setIsUpdating] = useState(false);
@@ -15,13 +37,66 @@ export default function AdminPage() {
   const [userMessage, setUserMessage] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
+  // Sync summary state (per-user last sync status dot)
+  const [syncSummary, setSyncSummary] = useState<Record<string, { status: string; createdAt: string } | null>>({});
+
+  // Inline collection ID edit state
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [editError, setEditError] = useState("");
+
+  // Expandable sync history state
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [syncLogs, setSyncLogs] = useState<Record<string, Array<{ id: string; status: string; errorMessage: string | null; source: string; createdAt: string }>>>({});
+
+  // Scraper health state
+  const [storeHealth, setStoreHealth] = useState<Record<string, { status: string; lastRun: string | null; error: string | null }>>({});
+  const [scraperHealthWarning, setScraperHealthWarning] = useState("");
+  const [expandedStore, setExpandedStore] = useState<string | null>(null);
+
   useEffect(() => {
+    async function fetchScraperHealth() {
+      try {
+        setScraperHealthWarning("");
+        const res = await fetch("/api/admin/scraper-health");
+        if (!res.ok) {
+          throw new Error(`Failed to fetch scraper health: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        setStoreHealth(data);
+      } catch (error) {
+        console.error("Failed to load scraper health", error);
+        setScraperHealthWarning("Unable to load scraper health data.");
+      }
+    }
+
     fetchUsers();
+    fetchScraperHealth();
   }, []);
+
+  async function fetchSyncSummary(userList: Array<{ id: string }>) {
+    const summaries: Record<string, { status: string; createdAt: string } | null> = {};
+    await Promise.all(
+      userList.map(async (u) => {
+        try {
+          const res = await fetch(`/api/admin/users/${u.id}/sync-logs`);
+          if (res.ok) {
+            const logs = await res.json();
+            summaries[u.id] = logs.length > 0 ? { status: logs[0].status, createdAt: logs[0].createdAt } : null;
+          }
+        } catch { /* ignore — summary is best-effort */ }
+      })
+    );
+    setSyncSummary(summaries);
+  }
 
   async function fetchUsers() {
     const res = await fetch("/api/admin/users");
-    if (res.ok) setUsers(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setUsers(data);
+      fetchSyncSummary(data);
+    }
   }
 
   async function handleDelete(userId: string) {
@@ -67,6 +142,46 @@ export default function AdminPage() {
     }
   }
 
+  async function handleSaveCollectionId(userId: string) {
+    const trimmed = editValue.trim();
+    if (!trimmed) return;
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moxfieldCollectionId: trimmed }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, moxfieldCollectionId: updated.moxfieldCollectionId } : u));
+        setEditingUserId(null);
+        setEditError("");
+      } else {
+        const data = await res.json();
+        setEditError(data.error || "Failed to save");
+      }
+    } catch {
+      setEditError("Network error");
+    }
+  }
+
+  async function handleToggleExpand(userId: string) {
+    if (expandedUserId === userId) {
+      setExpandedUserId(null);
+      return;
+    }
+    setExpandedUserId(userId);
+    if (!syncLogs[userId]) {
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/sync-logs`);
+        if (res.ok) {
+          const logs = await res.json();
+          setSyncLogs(prev => ({ ...prev, [userId]: logs }));
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
   const handleUpdate = async () => {
     setIsUpdating(true);
     setMessage("Updating collections...");
@@ -104,25 +219,84 @@ export default function AdminPage() {
             {users.map((user) => (
               <div
                 key={user.id}
-                className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg bg-background border border-border"
+                className="flex flex-col gap-2 p-3 rounded-lg bg-background border border-border cursor-pointer"
+                onClick={() => handleToggleExpand(user.id)}
               >
-                <div className="min-w-0">
-                  <span className="font-medium">{user.name}</span>
-                  <span className="block sm:inline text-sm text-muted sm:ml-2 font-mono truncate">{user.moxfieldCollectionId}</span>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <span className="font-medium">{user.name}</span>
+                    {editingUserId === user.id ? (
+                      <span className="block sm:inline sm:ml-2">
+                        <input
+                          autoFocus
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); handleSaveCollectionId(user.id); }
+                            if (e.key === "Escape") { setEditingUserId(null); setEditError(""); }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-mono text-sm px-1 py-0.5 rounded border border-accent bg-background text-foreground focus:outline-none w-48"
+                        />
+                        {editError && <span className="text-xs text-red-400 ml-1">{editError}</span>}
+                      </span>
+                    ) : (
+                      <span
+                        className="block sm:inline text-sm text-muted sm:ml-2 font-mono truncate cursor-pointer hover:text-foreground transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingUserId(user.id);
+                          setEditValue(user.moxfieldCollectionId);
+                          setEditError("");
+                        }}
+                        title="Click to edit"
+                      >
+                        {user.moxfieldCollectionId}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-muted">
+                      <StatusDot status={(syncSummary[user.id]?.status as "success" | "failure") ?? "unknown"} />
+                      <span>{syncSummary[user.id] ? relativeTime(syncSummary[user.id]!.createdAt) : "no syncs"}</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(user.id);
+                      }}
+                      className={`self-end sm:self-auto flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                        deleteConfirm === user.id
+                          ? "bg-destructive text-white"
+                          : "bg-destructive/10 text-red-400 hover:bg-destructive/20"
+                      }`}
+                    >
+                      {deleteConfirm === user.id ? "Confirm?" : "Delete"}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(user.id);
-                  }}
-                  className={`self-end sm:self-auto flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                    deleteConfirm === user.id
-                      ? "bg-destructive text-white"
-                      : "bg-destructive/10 text-red-400 hover:bg-destructive/20"
-                  }`}
-                >
-                  {deleteConfirm === user.id ? "Confirm?" : "Delete"}
-                </button>
+                {expandedUserId === user.id && (
+                  <div className="mt-2 border-t border-border pt-2 space-y-1">
+                    {(!syncLogs[user.id] || syncLogs[user.id].length === 0) ? (
+                      <p className="text-xs text-muted">No sync history</p>
+                    ) : (
+                      syncLogs[user.id].map((log) => (
+                        <div key={log.id} className="flex items-center gap-2 text-xs">
+                          <StatusDot status={log.status as "success" | "failure" | "unknown"} />
+                          <span className="text-muted">{relativeTime(log.createdAt)}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${log.source === "manual" ? "bg-blue-500/20 text-blue-300" : "bg-zinc-500/20 text-zinc-400"}`}>
+                            {log.source}
+                          </span>
+                          {log.errorMessage && (
+                            <span className="text-red-400 truncate" title={log.errorMessage}>
+                              {log.errorMessage.slice(0, 60)}{log.errorMessage.length > 60 ? "..." : ""}
+                            </span>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -182,6 +356,46 @@ export default function AdminPage() {
             {message}
           </p>
         )}
+      </div>
+
+      {/* Scraper Health section */}
+      <div className="rounded-lg border border-border bg-surface p-6 mt-6">
+        <h2 className="text-lg font-semibold mb-4">Scraper Health</h2>
+        <p className="text-xs text-muted mb-3">Status resets on cold start. Updated when users search for cards.</p>
+        <div className="space-y-1">
+          {Object.entries(storeHealth).length === 0 ? (
+            <p className="text-sm text-muted">No scraper data available.</p>
+          ) : (
+            Object.entries(storeHealth).map(([name, health]) => {
+              const isDisabled = DISABLED_STORES.has(name);
+              const displayStatus = isDisabled ? "unknown" : (health.status as "success" | "failure" | "unknown");
+              const isFailed = !isDisabled && health.status === "failure";
+              return (
+                <div key={name}>
+                  <div
+                    className={`flex items-center gap-2 p-2 rounded ${isFailed ? "cursor-pointer hover:bg-background" : ""}`}
+                    onClick={() => isFailed && setExpandedStore((prev) => (prev === name ? null : name))}
+                  >
+                    <StatusDot status={displayStatus} />
+                    <span className={`text-sm ${isDisabled ? "text-muted line-through" : "text-foreground"}`}>{name}</span>
+                    {isDisabled && <span className="text-xs text-muted">(disabled)</span>}
+                    {health.lastRun && !isDisabled && (
+                      <span className="text-xs text-muted ml-auto">{relativeTime(health.lastRun)}</span>
+                    )}
+                    {isFailed && (
+                      <span className="text-xs text-muted ml-auto">{expandedStore === name ? "▲" : "▼"}</span>
+                    )}
+                  </div>
+                  {expandedStore === name && isFailed && health.error && (
+                    <div className="ml-6 p-2 text-xs text-red-400 bg-red-500/5 rounded">
+                      {health.error.slice(0, 200)}{health.error.length > 200 ? "..." : ""}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );

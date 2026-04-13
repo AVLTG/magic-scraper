@@ -4,6 +4,7 @@ import { scrapeETB } from "./scrapeETB";
 import { scrapeDCC } from "./scrapeDCC";
 import { scrapeFTF } from "./scrapeFTF";
 import type { Product } from "@/types/product";
+import { setStoreHealth } from "@/lib/scraperHealthCache";
 
 export async function scrapeAllSites(
   card: string
@@ -27,9 +28,19 @@ export async function scrapeAllSites(
     results.forEach((result, i) => {
       if (result.status === "fulfilled") {
         products.push(...result.value);
+        setStoreHealth(storeNames[i], {
+          status: "success",
+          lastRun: new Date().toISOString(),
+          error: null,
+        });
       } else {
         console.error(`${storeNames[i]} failed:`, result.reason);
         failedStores.push(storeNames[i]);
+        setStoreHealth(storeNames[i], {
+          status: "failure",
+          lastRun: new Date().toISOString(),
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
       }
     });
 

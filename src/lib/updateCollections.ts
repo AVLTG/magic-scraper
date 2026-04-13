@@ -1,13 +1,17 @@
 import { prisma } from './prisma';
 import { scrapeMoxfield } from './scrapeMoxfield/scrapeMoxfield';
 
-export async function updateAllCollections() {
+export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): Promise<{
+  succeeded: string[];
+  failed: Array<{ name: string; error: string }>;
+}> {
   const users = await prisma.user.findMany();
-  
+
   console.log(`Starting update for ${users.length} users...`);
   console.log('Users:', users.map(u => ({ name: u.name, id: u.moxfieldCollectionId })));
-  
-  const failed: string[] = [];
+
+  const failed: Array<{ name: string; error: string }> = [];
+  const succeeded: string[] = [];
 
   for (let i = 0; i < users.length; i++) {
     const user = users[i];
@@ -28,6 +32,15 @@ export async function updateAllCollections() {
 
       if (cards.length === 0) {
         console.log('No cards scraped - skipping database update');
+        const zeroCardsMsg = 'No cards scraped';
+        failed.push({ name: user.name, error: zeroCardsMsg });
+        try {
+          await prisma.syncLog.create({
+            data: { userId: user.id, status: 'failure', errorMessage: zeroCardsMsg, source },
+          });
+        } catch (logError) {
+          console.error(`Failed to write SyncLog for ${user.name}:`, logError);
+        }
         continue;
       }
 
@@ -62,21 +75,42 @@ export async function updateAllCollections() {
         });
       });
 
+      // Write SyncLog entry for successful sync
+      try {
+        await prisma.syncLog.create({
+          data: { userId: user.id, status: 'success', source },
+        });
+      } catch (logError) {
+        console.error(`Failed to write SyncLog for ${user.name}:`, logError);
+      }
+
+      succeeded.push(user.name);
       console.log(`Successfully updated ${cards.length} cards for ${user.name}`);
     } catch (error) {
       // Log but continue — don't let one user's failure stop the rest
       const msg = error instanceof Error ? error.message : String(error);
       console.error(`Failed to update ${user.name}: ${msg}`);
-      failed.push(user.name);
+      failed.push({ name: user.name, error: msg });
+
+      // Write SyncLog entry for failed sync
+      try {
+        await prisma.syncLog.create({
+          data: { userId: user.id, status: 'failure', errorMessage: msg.slice(0, 500), source },
+        });
+      } catch (logError) {
+        console.error(`Failed to write SyncLog for ${user.name}:`, logError);
+      }
     }
   }
 
   if (failed.length > 0) {
-    console.error(`\nFailed users: ${failed.join(', ')}`);
+    console.error(`\nFailed users: ${failed.map(f => f.name).join(', ')}`);
   }
-  
+
   // Final check
   const totalCards = await prisma.collectionCard.count();
   console.log(`\n=== Update Complete ===`);
   console.log(`Total cards in database: ${totalCards}`);
+
+  return { succeeded, failed };
 }
