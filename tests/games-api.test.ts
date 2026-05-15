@@ -225,7 +225,7 @@ describe('POST /api/games', () => {
     expect(mockTransaction).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when more than 4 participants', async () => {
+  it('returns 400 when more than 8 participants', async () => {
     const body = {
       ...validGameBody,
       participants: [
@@ -234,10 +234,40 @@ describe('POST /api/games', () => {
         { playerName: 'C', isWinner: false, isScrewed: false },
         { playerName: 'D', isWinner: false, isScrewed: false },
         { playerName: 'E', isWinner: false, isScrewed: false },
+        { playerName: 'F', isWinner: false, isScrewed: false },
+        { playerName: 'G', isWinner: false, isScrewed: false },
+        { playerName: 'H', isWinner: false, isScrewed: false },
+        { playerName: 'I', isWinner: false, isScrewed: false },
       ],
     };
     const res: any = await POST(makeRequest(body));
     expect(res.status).toBe(400);
+  });
+
+  it('accepts exactly 8 participants', async () => {
+    mockGameCreate.mockResolvedValue({
+      id: 'g-8',
+      date: new Date('2026-04-10T00:00:00.000Z'),
+      wonByCombo: false,
+      notes: 'Close game',
+      createdAt: new Date(),
+    });
+    mockParticipantCreateMany.mockResolvedValue({ count: 8 });
+    const body = {
+      ...validGameBody,
+      participants: [
+        { playerName: 'A', isWinner: true, isScrewed: false },
+        { playerName: 'B', isWinner: false, isScrewed: false },
+        { playerName: 'C', isWinner: false, isScrewed: false },
+        { playerName: 'D', isWinner: false, isScrewed: false },
+        { playerName: 'E', isWinner: false, isScrewed: false },
+        { playerName: 'F', isWinner: false, isScrewed: false },
+        { playerName: 'G', isWinner: false, isScrewed: false },
+        { playerName: 'H', isWinner: false, isScrewed: false },
+      ],
+    };
+    const res: any = await POST(makeRequest(body));
+    expect(res.status).toBe(201);
   });
 
   it('returns 400 when playerName is empty string', async () => {

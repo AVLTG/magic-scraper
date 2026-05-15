@@ -25,13 +25,14 @@ export const gameParticipantSchema = z.object({
 export type GameParticipantInput = z.infer<typeof gameParticipantSchema>;
 
 // -----------------------------------------------------------------------------
-// Game validator (D-01, GAME-01 "1-4 players", GAME-09 sanitization)
+// Game validator (D-01, GAME-01 "1-8 players", GAME-09 sanitization)
 // -----------------------------------------------------------------------------
 // date: coerced from ISO string or Date (API bodies arrive as JSON strings)
 // wonByCombo: defaults to false per D-01 — Phase 6 form toggle
 // notes: optional per D-01; trimmed and length-clamped per GAME-09
-// participants: 1-4 entries per GAME-01; winner count NOT enforced here
-//   (Phase 6 may want to allow unresolved-winner drafts — defer to route)
+// participants: 1-8 entries (raised from 1-4 in 2026-05-15 game-tracking expansion);
+//   winner count NOT enforced here (Phase 6 may want to allow unresolved-winner
+//   drafts — defer to route)
 export const gameSchema = z.object({
   date: z.coerce.date(),
   wonByCombo: z.boolean().default(false),
@@ -49,7 +50,7 @@ export const gameSchema = z.object({
   participants: z
     .array(gameParticipantSchema)
     .min(1, "at least one participant required")
-    .max(4, "at most four participants per game")
+    .max(8, "at most eight participants per game")
     .refine(
       (arr) => new Set(arr.map((p) => p.playerName.toLowerCase())).size === arr.length,
       { message: "duplicate player names not allowed" }
