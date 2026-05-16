@@ -360,3 +360,53 @@ export function filterGamesByTimeframe(games: Game[], timeframe: Timeframe): Gam
   const cutoffMs = Date.now() - TIMEFRAME_DAYS[timeframe] * 86_400_000;
   return games.filter((g) => new Date(g.date).getTime() >= cutoffMs);
 }
+
+/**
+ * Total screwed-count per player across ALL games (D-17 — player stats include
+ * imported games). Omits players with 0 screwed counts. Sorted by screwed desc.
+ * Mirrors computeWinsByPlayerPie shape.
+ */
+export function computeScrewedByPlayerBar(
+  games: Game[]
+): { player: string; screwed: number }[] {
+  const map = new Map<string, number>();
+  for (const g of games) {
+    for (const p of g.participants) {
+      if (p.isScrewed) {
+        map.set(p.playerName, (map.get(p.playerName) ?? 0) + 1);
+      }
+    }
+  }
+  return Array.from(map.entries())
+    .filter(([, screwed]) => screwed > 0)
+    .map(([player, screwed]) => ({ player, screwed }))
+    .sort((a, b) => b.screwed - a.screwed);
+}
+
+/**
+ * Screwed counts per deck across NON-IMPORTED games (D-16 — deck stats exclude
+ * imports because imported games' deckNames are spreadsheet-derived best guesses).
+ * For each non-imported game, increments a deck's screwed count once per
+ * participant who used that deck AND has isScrewed === true. Skips null/empty/
+ * whitespace-only deckName. Returns top 15 sorted by screwed desc; no 'Other' bucket.
+ * Mirrors computeGamesByDeckPie shape.
+ */
+export function computeScrewedByDeckPie(
+  games: Game[]
+): { deck: string; screwed: number }[] {
+  const nonImported = games.filter((g) => !g.isImported);
+  const map = new Map<string, number>();
+  for (const g of nonImported) {
+    for (const p of g.participants) {
+      if (!p.isScrewed) continue;
+      const deck = p.deckName?.trim();
+      if (!deck) continue;
+      map.set(deck, (map.get(deck) ?? 0) + 1);
+    }
+  }
+  const all = Array.from(map.entries())
+    .filter(([, screwed]) => screwed > 0)
+    .map(([deck, screwed]) => ({ deck, screwed }))
+    .sort((a, b) => b.screwed - a.screwed);
+  return all.slice(0, 15);
+}

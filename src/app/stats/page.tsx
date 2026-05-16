@@ -13,6 +13,8 @@ import {
   computeMostLikelyToPlayBump,
   computeWinsByPlayerPie,
   computeGamesByDeckPie,
+  computeScrewedByPlayerBar,
+  computeScrewedByDeckPie,
   computePlayerRadar,
   filterGamesByTimeframe,
   type Timeframe,
@@ -28,6 +30,8 @@ const PlayerWinRateBar = dynamic(() => import('./charts/PlayerWinRateBar'), { ss
 const DeckWinRateBar = dynamic(() => import('./charts/DeckWinRateBar'), { ssr: false });
 const WinsByPlayerPie = dynamic(() => import('./charts/WinsByPlayerPie'), { ssr: false });
 const GamesByDeckPie = dynamic(() => import('./charts/GamesByDeckPie'), { ssr: false });
+const ScrewedByPlayerBar = dynamic(() => import('./charts/ScrewedByPlayerBar'), { ssr: false });
+const ScrewedByDeckPie = dynamic(() => import('./charts/ScrewedByDeckPie'), { ssr: false });
 const WeeklyFrequencyLine = dynamic(() => import('./charts/WeeklyFrequencyLine'), { ssr: false });
 const MostLikelyBump = dynamic(() => import('./charts/MostLikelyBump'), { ssr: false });
 
@@ -51,6 +55,8 @@ const CHART_IDS = {
   DECK_WIN_BAR: 'deck-win-rate',
   WINS_BY_PLAYER_PIE: 'wins-by-player',
   GAMES_BY_DECK_PIE: 'games-by-deck',
+  SCREWED_BY_PLAYER_BAR: 'screwed-by-player',
+  SCREWED_BY_DECK_PIE: 'screwed-by-deck',
   WEEKLY_FREQ: 'weekly-frequency',
   LIKELY_BUMP: 'most-likely-bump',
 } as const;
@@ -166,6 +172,8 @@ export default function StatsPage() {
   const screwedRate = useMemo(() => computeScrewedRate(games), [games]);
   const winsByPlayer = useMemo(() => computeWinsByPlayerPie(games), [games]);
   const gamesByDeck = useMemo(() => computeGamesByDeckPie(games), [games]);
+  const screwedByPlayer = useMemo(() => computeScrewedByPlayerBar(games), [games]);
+  const screwedByDeck = useMemo(() => computeScrewedByDeckPie(games), [games]);
   const playerRadar = useMemo(() => computePlayerRadar(games), [games]);
 
   // Frequency-section charts: filtered by the active timeframe (2026-05-15)
@@ -246,6 +254,14 @@ export default function StatsPage() {
       case CHART_IDS.GAMES_BY_DECK_PIE:
         return gamesByDeck.length > 0
           ? `${gamesByDeck[0].deck} most played`
+          : 'No data yet';
+      case CHART_IDS.SCREWED_BY_PLAYER_BAR:
+        return screwedByPlayer.length > 0
+          ? `${screwedByPlayer[0].player} screwed most (${screwedByPlayer[0].screwed})`
+          : 'No data yet';
+      case CHART_IDS.SCREWED_BY_DECK_PIE:
+        return screwedByDeck.length > 0
+          ? `${screwedByDeck[0].deck} screwed most (${screwedByDeck[0].screwed})`
           : 'No data yet';
       case CHART_IDS.WEEKLY_FREQ: {
         if (weeklyFrequency.length === 0) return 'No data yet';
@@ -334,9 +350,16 @@ export default function StatsPage() {
             <h2 className="text-xl font-bold text-foreground tracking-tight mb-4">Breakdowns</h2>
             {(() => {
               // Equalize Breakdowns row height so the Games-by-deck pie expands
-              // to match the (taller, data-driven) Wins-by-player bar chart and
-              // doesn't leave empty space at the bottom of its card.
-              const breakdownsHeight = Math.max(320, winsByPlayer.length * 40);
+              // to match the taller, data-driven bar charts and doesn't leave
+              // empty space at the bottom of its card. Factors in BOTH
+              // winsByPlayer and screwedByPlayer lengths so the row stays sized
+              // to whichever bar chart has more rows (typically wins, but
+              // defensive against the rare case where screwed counts dominate).
+              const breakdownsHeight = Math.max(
+                320,
+                winsByPlayer.length * 40,
+                screwedByPlayer.length * 40
+              );
               return (
               <div className="sm:grid sm:grid-cols-2 sm:gap-6">
               <ChartSection
@@ -362,6 +385,33 @@ export default function StatsPage() {
               >
                 {gamesByDeck.length > 0 ? (
                   <GamesByDeckPie data={gamesByDeck} chartTokens={chartTokens} height={breakdownsHeight} />
+                ) : (
+                  <EmptyChart />
+                )}
+              </ChartSection>
+              <ChartSection
+                id={CHART_IDS.SCREWED_BY_PLAYER_BAR}
+                title="Screwed by player"
+                summary={getSummary(CHART_IDS.SCREWED_BY_PLAYER_BAR)}
+                expanded={expandedCharts.has(CHART_IDS.SCREWED_BY_PLAYER_BAR)}
+                onToggle={() => toggleChart(CHART_IDS.SCREWED_BY_PLAYER_BAR)}
+              >
+                {screwedByPlayer.length > 0 ? (
+                  <ScrewedByPlayerBar data={screwedByPlayer} chartTokens={chartTokens} height={breakdownsHeight} />
+                ) : (
+                  <EmptyChart />
+                )}
+              </ChartSection>
+              <ChartSection
+                id={CHART_IDS.SCREWED_BY_DECK_PIE}
+                title="Screwed by deck"
+                description="Showing top 15 decks"
+                summary={getSummary(CHART_IDS.SCREWED_BY_DECK_PIE)}
+                expanded={expandedCharts.has(CHART_IDS.SCREWED_BY_DECK_PIE)}
+                onToggle={() => toggleChart(CHART_IDS.SCREWED_BY_DECK_PIE)}
+              >
+                {screwedByDeck.length > 0 ? (
+                  <ScrewedByDeckPie data={screwedByDeck} chartTokens={chartTokens} height={breakdownsHeight} />
                 ) : (
                   <EmptyChart />
                 )}

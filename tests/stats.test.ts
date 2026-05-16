@@ -10,6 +10,8 @@ import {
   computeMostLikelyToPlayBump,
   computeWinsByPlayerPie,
   computeGamesByDeckPie,
+  computeScrewedByPlayerBar,
+  computeScrewedByDeckPie,
   computePlayerRadar,
   filterGamesByTimeframe,
   type Timeframe,
@@ -534,5 +536,192 @@ describe('filterGamesByTimeframe (2026-05-15)', () => {
   it('Timeframe type accepts only the five expected values', () => {
     const valid: Timeframe[] = ['1M', '3M', '1Y', '3Y', 'all'];
     expect(valid).toHaveLength(5);
+  });
+});
+
+describe('computeScrewedByPlayerBar (2026-05-16)', () => {
+  it('returns empty array for empty input', () => {
+    expect(computeScrewedByPlayerBar([])).toEqual([]);
+  });
+
+  it('counts isScrewed flags per player across all games', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isScrewed: true, isWinner: true }),
+        mkParticipant('Bob'),
+      ]),
+      mkGame('2026-04-02', [
+        mkParticipant('Alice', { isScrewed: true }),
+        mkParticipant('Bob', { isScrewed: true, isWinner: true }),
+      ]),
+    ];
+    const result = computeScrewedByPlayerBar(games);
+    expect(result).toEqual([
+      { player: 'Alice', screwed: 2 },
+      { player: 'Bob', screwed: 1 },
+    ]);
+  });
+
+  it('omits players with 0 screwed counts (D-19)', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isScrewed: true, isWinner: true }),
+        mkParticipant('Bob'),
+        mkParticipant('Carol'),
+      ]),
+    ];
+    const result = computeScrewedByPlayerBar(games);
+    expect(result.map((d) => d.player)).toEqual(['Alice']);
+    expect(result.find((d) => d.player === 'Bob')).toBeUndefined();
+    expect(result.find((d) => d.player === 'Carol')).toBeUndefined();
+  });
+
+  it('sorts by screwed count descending', () => {
+    // Three players exercise the comparator unambiguously: insertion order is
+    // Alice → Bob → Carol, but final counts are Bob 3, Carol 2, Alice 1, so
+    // neither insertion order nor its reverse matches the expected output.
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isScrewed: true, isWinner: true }),
+      ]),
+      mkGame('2026-04-02', [
+        mkParticipant('Bob', { isScrewed: true, isWinner: true }),
+      ]),
+      mkGame('2026-04-03', [
+        mkParticipant('Bob', { isScrewed: true, isWinner: true }),
+      ]),
+      mkGame('2026-04-04', [
+        mkParticipant('Bob', { isScrewed: true, isWinner: true }),
+      ]),
+      mkGame('2026-04-05', [
+        mkParticipant('Carol', { isScrewed: true, isWinner: true }),
+      ]),
+      mkGame('2026-04-06', [
+        mkParticipant('Carol', { isScrewed: true, isWinner: true }),
+      ]),
+    ];
+    const result = computeScrewedByPlayerBar(games);
+    expect(result).toEqual([
+      { player: 'Bob', screwed: 3 },
+      { player: 'Carol', screwed: 2 },
+      { player: 'Alice', screwed: 1 },
+    ]);
+  });
+
+  it('INCLUDES imported games (D-17 — player-level stats include all games)', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isScrewed: true, isWinner: true }),
+      ], { isImported: true }),
+    ];
+    const result = computeScrewedByPlayerBar(games);
+    expect(result).toEqual([{ player: 'Alice', screwed: 1 }]);
+  });
+});
+
+describe('computeScrewedByDeckPie (2026-05-16)', () => {
+  it('returns empty array for empty input', () => {
+    expect(computeScrewedByDeckPie([])).toEqual([]);
+  });
+
+  it('counts screwed-participants by their deckName in non-imported games', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isScrewed: true, isWinner: true, deckName: 'Atraxa' }),
+        mkParticipant('Bob', { isScrewed: true, deckName: 'Goblins' }),
+      ]),
+      mkGame('2026-04-02', [
+        mkParticipant('Alice', { isScrewed: true, deckName: 'Atraxa' }),
+        mkParticipant('Bob', { isWinner: true, deckName: 'Goblins' }),
+      ]),
+    ];
+    const result = computeScrewedByDeckPie(games);
+    expect(result).toEqual([
+      { deck: 'Atraxa', screwed: 2 },
+      { deck: 'Goblins', screwed: 1 },
+    ]);
+  });
+
+  it('skips participants with null deckName', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isScrewed: true, isWinner: true, deckName: null }),
+        mkParticipant('Bob', { isScrewed: true, deckName: 'Goblins' }),
+      ]),
+    ];
+    const result = computeScrewedByDeckPie(games);
+    expect(result).toEqual([{ deck: 'Goblins', screwed: 1 }]);
+  });
+
+  it('skips participants with empty / whitespace-only deckName', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isScrewed: true, isWinner: true, deckName: '' }),
+        mkParticipant('Bob', { isScrewed: true, deckName: '   ' }),
+        mkParticipant('Carol', { isScrewed: true, deckName: 'Elves' }),
+      ]),
+    ];
+    const result = computeScrewedByDeckPie(games);
+    expect(result).toEqual([{ deck: 'Elves', screwed: 1 }]);
+  });
+
+  it('EXCLUDES imported games (D-16 — deck stats exclude imports)', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isScrewed: true, isWinner: true, deckName: 'Atraxa' }),
+      ], { isImported: true }),
+      mkGame('2026-04-02', [
+        mkParticipant('Bob', { isScrewed: true, isWinner: true, deckName: 'Goblins' }),
+      ]),
+    ];
+    const result = computeScrewedByDeckPie(games);
+    expect(result).toEqual([{ deck: 'Goblins', screwed: 1 }]);
+  });
+
+  it('returns all entries when fewer than 15 distinct decks', () => {
+    const games = Array.from({ length: 5 }, (_, i) =>
+      mkGame('2026-04-01', [
+        mkParticipant('P', { isScrewed: true, isWinner: true, deckName: `Deck${i}` }),
+      ])
+    );
+    const result = computeScrewedByDeckPie(games);
+    expect(result).toHaveLength(5);
+    expect(result.find((d) => d.deck === 'Other')).toBeUndefined();
+  });
+
+  it('caps at top 15 and never includes Other', () => {
+    const games: Game[] = [];
+    for (let i = 0; i < 20; i++) {
+      // Deck i screwed (i+1) times so the highest deck is at index 19 with 20 screws
+      for (let j = 0; j <= i; j++) {
+        games.push(
+          mkGame('2026-04-01', [
+            mkParticipant('P', { isScrewed: true, isWinner: true, deckName: `Deck${i}` }),
+          ])
+        );
+      }
+    }
+    const result = computeScrewedByDeckPie(games);
+    expect(result).toHaveLength(15);
+    expect(result.find((d) => d.deck === 'Other')).toBeUndefined();
+    expect(result[0]).toEqual({ deck: 'Deck19', screwed: 20 });
+    expect(result[14].deck).toBe('Deck5');
+  });
+
+  it('sorts by screwed count descending', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('A', { isScrewed: true, isWinner: true, deckName: 'Less' }),
+      ]),
+      mkGame('2026-04-02', [
+        mkParticipant('B', { isScrewed: true, isWinner: true, deckName: 'More' }),
+      ]),
+      mkGame('2026-04-03', [
+        mkParticipant('C', { isScrewed: true, isWinner: true, deckName: 'More' }),
+      ]),
+    ];
+    const result = computeScrewedByDeckPie(games);
+    expect(result[0]).toEqual({ deck: 'More', screwed: 2 });
+    expect(result[1]).toEqual({ deck: 'Less', screwed: 1 });
   });
 });
