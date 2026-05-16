@@ -29,7 +29,7 @@ export type { Participant, Game };
 
 export interface FilterState {
   winner: string | null;
-  playerCount: 2 | 3 | 4 | null;
+  playerCount: 2 | 3 | 4 | 5 | 6 | 7 | 8 | null;
   players: string[];
 }
 
@@ -107,7 +107,7 @@ export default function GamesPage() {
 
   // Phase 6.1 D-21: ephemeral client-side filter state (no URL state, no search params)
   const [winnerFilter, setWinnerFilter] = useState<string | null>(null);
-  const [countFilter, setCountFilter] = useState<2 | 3 | 4 | null>(null);
+  const [countFilter, setCountFilter] = useState<2 | 3 | 4 | 5 | 6 | 7 | 8 | null>(null);
   const [playerFilters, setPlayerFilters] = useState<string[]>([]);
 
   useEffect(() => {
@@ -219,7 +219,7 @@ export default function GamesPage() {
             <select
               value={countFilter ?? ''}
               onChange={(e) =>
-                setCountFilter(e.target.value === '' ? null : (Number(e.target.value) as 2 | 3 | 4))
+                setCountFilter(e.target.value === '' ? null : (Number(e.target.value) as 2 | 3 | 4 | 5 | 6 | 7 | 8))
               }
               className="px-3 py-2 rounded-md border border-border bg-surface text-foreground text-sm"
             >
@@ -227,6 +227,10 @@ export default function GamesPage() {
               <option value="2">2 players</option>
               <option value="3">3 players</option>
               <option value="4">4 players</option>
+              <option value="5">5 players</option>
+              <option value="6">6 players</option>
+              <option value="7">7 players</option>
+              <option value="8">8 players</option>
             </select>
           </div>
 

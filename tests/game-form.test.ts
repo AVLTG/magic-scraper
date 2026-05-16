@@ -1,6 +1,5 @@
 import {
   excludeItemsForRow,
-  filterEmptyRows,
   validateGameForm,
 } from '../src/app/games/game-form';
 
@@ -20,38 +19,17 @@ function baseState(
   winnerIndex: number,
   overrides: Partial<{ date: string; notes: string; wonByCombo: boolean }> = {}
 ) {
-  const padded = [...rows];
-  while (padded.length < 4) padded.push(row(''));
   return {
     date: '2026-04-10',
     notes: '',
     wonByCombo: false,
-    rows: padded.slice(0, 4),
+    rows,
     winnerIndex,
     ...overrides,
   };
 }
 
-describe('filterEmptyRows', () => {
-  it('removes rows with empty playerName', () => {
-    const rows = [row('Alice'), row(''), row('Bob'), row('  ')];
-    expect(filterEmptyRows(rows)).toHaveLength(2);
-  });
-
-  it('preserves order', () => {
-    const rows = [row(''), row('Alice'), row(''), row('Bob')];
-    const filtered = filterEmptyRows(rows);
-    expect(filtered[0].playerName).toBe('Alice');
-    expect(filtered[1].playerName).toBe('Bob');
-  });
-
-  it('trims before checking', () => {
-    expect(filterEmptyRows([row('   ')])).toHaveLength(0);
-    expect(filterEmptyRows([row(' X ')])).toHaveLength(1);
-  });
-});
-
-describe('validateGameForm', () => {
+describe('validateGameForm — strict variable-length rules', () => {
   it('accepts a valid 2-player game', () => {
     const state = baseState(
       [row('Alice', { isWinner: true }), row('Bob', { isScrewed: true })],
@@ -66,40 +44,68 @@ describe('validateGameForm', () => {
     }
   });
 
-  it('rejects when date missing', () => {
-    const state = baseState([row('Alice')], 0, { date: '' });
+  it('accepts a valid 6-player game', () => {
+    const state = baseState(
+      [
+        row('A', { isWinner: true }),
+        row('B'),
+        row('C'),
+        row('D'),
+        row('E'),
+        row('F'),
+      ],
+      0
+    );
     const result = validateGameForm(state);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.errors.date).toBeDefined();
-    }
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.payload.participants).toHaveLength(6);
   });
 
-  it('rejects when no non-empty rows', () => {
-    const state = baseState([], -1);
+  it('accepts a valid 8-player game', () => {
+    const state = baseState(
+      Array.from({ length: 8 }, (_, i) =>
+        row(`P${i}`, i === 0 ? { isWinner: true } : {})
+      ),
+      0
+    );
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.payload.participants).toHaveLength(8);
+  });
+
+  it('rejects when date missing', () => {
+    const state = baseState([row('Alice', { isWinner: true })], 0, { date: '' });
     const result = validateGameForm(state);
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.errors.form).toMatch(/participant/i);
-    }
+    if (!result.ok) expect(result.errors.date).toBeDefined();
+  });
+
+  it('rejects when any row is blank (strict rule)', () => {
+    const state = baseState([row('Alice', { isWinner: true }), row('')], 0);
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.form).toMatch(/all 2 participant names are required/i);
+  });
+
+  it('rejects when every row is blank', () => {
+    const state = baseState([row(''), row(''), row(''), row('')], -1);
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.form).toMatch(/all 4 participant names are required/i);
   });
 
   it('rejects when winnerIndex is -1 (no winner)', () => {
     const state = baseState([row('Alice'), row('Bob')], -1);
     const result = validateGameForm(state);
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.errors.form).toMatch(/winner/i);
-    }
+    if (!result.ok) expect(result.errors.form).toMatch(/winner/i);
   });
 
-  it('rejects when winner is on an empty row (Pitfall 4)', () => {
-    const state = baseState([row('Alice'), row('')], 1);
+  it('rejects when winnerIndex is out of range', () => {
+    const state = baseState([row('Alice'), row('Bob')], 5);
     const result = validateGameForm(state);
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.errors.form).toMatch(/winner/i);
-    }
+    if (!result.ok) expect(result.errors.form).toMatch(/winner/i);
   });
 
   it('allows winner AND screwed on same player (D-02)', () => {
@@ -122,9 +128,7 @@ describe('validateGameForm', () => {
     const state = baseState([row('Alice', { isWinner: true, deckName: '' })], 0);
     const result = validateGameForm(state);
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.payload.participants[0].deckName).toBeUndefined();
-    }
+    if (result.ok) expect(result.payload.participants[0].deckName).toBeUndefined();
   });
 
   it('trims playerName and deckName in payload', () => {
@@ -137,77 +141,64 @@ describe('validateGameForm', () => {
     }
   });
 
-  it('remaps winner index correctly after filtering empty rows', () => {
-    // Row 0 empty, row 1 Alice with winner flag, row 2 Bob.
-    // After filter: [Alice (index 0, winner), Bob (index 1)]
-    const state = {
-      date: '2026-04-10',
-      notes: '',
-      wonByCombo: false,
-      rows: [
-        row(''),
-        row('Alice', { isWinner: true }),
-        row('Bob'),
-        row(''),
-      ],
-      winnerIndex: 1,
-    };
+  it('preserves row order in payload (no filtering/remapping)', () => {
+    const state = baseState(
+      [row('Alice'), row('Bob', { isWinner: true }), row('Carol')],
+      1
+    );
     const result = validateGameForm(state);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.payload.participants[0].isWinner).toBe(true);
-      expect(result.payload.participants[1].isWinner).toBe(false);
+      expect(result.payload.participants.map((p) => p.playerName)).toEqual(['Alice', 'Bob', 'Carol']);
+      expect(result.payload.participants[1].isWinner).toBe(true);
+      expect(result.payload.participants[0].isWinner).toBe(false);
+      expect(result.payload.participants[2].isWinner).toBe(false);
     }
   });
 });
 
 describe('excludeItemsForRow (D-10, D-11)', () => {
-  function stateOf(names: string[]): {
-    date: string;
-    notes: string;
-    wonByCombo: boolean;
-    rows: ParticipantRow[];
-    winnerIndex: number;
-  } {
-    const rows: ParticipantRow[] = [0, 1, 2, 3].map((i) => ({
-      playerName: names[i] ?? '',
-      deckName: '',
-      isWinner: false,
-      isScrewed: false,
-    }));
-    return { date: '2026-04-10', notes: '', wonByCombo: false, rows, winnerIndex: -1 };
-  }
+  const sampleState = (rows: ParticipantRow[]) => ({ rows });
 
   it('returns all other filled rows for row 0', () => {
-    expect(excludeItemsForRow(0, stateOf(['A', 'B', '', '']))).toEqual(['B']);
+    const state = sampleState([row('Alice'), row('Bob'), row('Carol')]);
+    expect(excludeItemsForRow(0, state)).toEqual(['Bob', 'Carol']);
   });
 
   it('returns the other filled row for row 1', () => {
-    expect(excludeItemsForRow(1, stateOf(['A', 'B', '', '']))).toEqual(['A']);
+    const state = sampleState([row('Alice'), row('Bob'), row('Carol')]);
+    expect(excludeItemsForRow(1, state)).toEqual(['Alice', 'Carol']);
   });
 
   it('returns both filled rows for an empty row 2', () => {
-    expect(excludeItemsForRow(2, stateOf(['A', 'B', '', '']))).toEqual(['A', 'B']);
+    const state = sampleState([row('Alice'), row('Bob'), row('')]);
+    expect(excludeItemsForRow(2, state)).toEqual(['Alice', 'Bob']);
   });
 
   it('returns empty array when all rows are empty', () => {
-    expect(excludeItemsForRow(0, stateOf([]))).toEqual([]);
+    const state = sampleState([row(''), row(''), row('')]);
+    expect(excludeItemsForRow(0, state)).toEqual([]);
   });
 
   it('treats whitespace-only rows as empty', () => {
-    expect(excludeItemsForRow(0, stateOf(['', '   ', 'Carol', '']))).toEqual(['Carol']);
+    const state = sampleState([row('Alice'), row('   '), row('Bob')]);
+    expect(excludeItemsForRow(0, state)).toEqual(['Bob']);
   });
 
   it('trims leading/trailing whitespace from included names', () => {
-    expect(excludeItemsForRow(0, stateOf(['', '  Bob  ', '', '']))).toEqual(['Bob']);
+    const state = sampleState([row('Alice'), row('  Bob  '), row('Carol')]);
+    expect(excludeItemsForRow(0, state)).toEqual(['Bob', 'Carol']);
   });
 
   it("does NOT include the caller row's own name (D-11 — row sees its own value)", () => {
-    // Row 0 is 'A'; excludeItemsForRow(0, ...) must NOT include 'A' — only the OTHER rows' names.
-    expect(excludeItemsForRow(0, stateOf(['A', 'B', 'C', '']))).toEqual(['B', 'C']);
+    const state = sampleState([row('Alice'), row('Bob'), row('Carol')]);
+    expect(excludeItemsForRow(0, state)).not.toContain('Alice');
   });
 
-  it('handles 4-row full state for row 3', () => {
-    expect(excludeItemsForRow(3, stateOf(['A', 'B', 'C', 'D']))).toEqual(['A', 'B', 'C']);
+  it('handles 8-row full state for row 7', () => {
+    const state = sampleState(
+      Array.from({ length: 8 }, (_, i) => row(`P${i}`))
+    );
+    expect(excludeItemsForRow(7, state)).toEqual(['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6']);
   });
 });

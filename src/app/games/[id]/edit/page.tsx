@@ -60,7 +60,14 @@ export default function EditGamePage({ params }: { params: Promise<{ id: string 
       <h1 className="text-2xl font-bold text-foreground mb-4">Edit game</h1>
       {loadError && <p className="text-red-600">{loadError}</p>}
       {!loadError && !initial && <p className="text-muted">Loading...</p>}
-      {initial && <GameForm initial={initial} onSubmit={handleSubmit} submitLabel="Save changes" />}
+      {initial && (
+        <GameForm
+          playerCount={initial.rows.length}
+          initial={initial}
+          onSubmit={handleSubmit}
+          submitLabel="Save changes"
+        />
+      )}
     </main>
   );
 }

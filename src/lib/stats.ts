@@ -307,12 +307,9 @@ export function computeGamesByDeckPie(
     .map(([deck, count]) => ({ deck, games: count }))
     .sort((a, b) => b.games - a.games);
 
-  if (all.length <= 14) return all;
-
-  const top = all.slice(0, 14);
-  const rest = all.slice(14);
-  const otherGames = rest.reduce((s, d) => s + d.games, 0);
-  return [...top, { deck: 'Other', games: otherGames }];
+  // 2026-05-15: switched from "top 14 + Other" to "top 15, no Other" because
+  // the long-tail aggregate frequently dominated the pie chart.
+  return all.slice(0, 15);
 }
 
 /**
@@ -341,4 +338,25 @@ export function computePlayerRadar(
   return Array.from(map.entries())
     .filter(([, v]) => v.played > 0)
     .map(([player, v]) => ({ player, ...v, totalGames }));
+}
+
+// ---------------------------------------------------------------------------
+// Timeframe filter (2026-05-15) — used by the Frequency-section pill control
+// on /stats. "Last N days" is calculated from Date.now() at call time so the
+// filter is deterministic across re-renders within one tick.
+// ---------------------------------------------------------------------------
+
+export type Timeframe = '1M' | '3M' | '1Y' | '3Y' | 'all';
+
+const TIMEFRAME_DAYS: Record<Exclude<Timeframe, 'all'>, number> = {
+  '1M': 30,
+  '3M': 90,
+  '1Y': 365,
+  '3Y': 1095,
+};
+
+export function filterGamesByTimeframe(games: Game[], timeframe: Timeframe): Game[] {
+  if (timeframe === 'all') return games;
+  const cutoffMs = Date.now() - TIMEFRAME_DAYS[timeframe] * 86_400_000;
+  return games.filter((g) => new Date(g.date).getTime() >= cutoffMs);
 }

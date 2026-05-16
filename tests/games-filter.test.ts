@@ -78,6 +78,18 @@ describe('matchesAllFilters (D-17)', () => {
       expect(matchesAllFilters(gameAB, { ...EMPTY_FILTERS, playerCount: 4 })).toBe(false);
       expect(matchesAllFilters(gameABCD, { ...EMPTY_FILTERS, playerCount: 2 })).toBe(false);
     });
+    it('matches a 6-player game when playerCount filter is 6', () => {
+      const game6 = mkGame('g6', [
+        mkParticipant('A', true),
+        mkParticipant('B'),
+        mkParticipant('C'),
+        mkParticipant('D'),
+        mkParticipant('E'),
+        mkParticipant('F'),
+      ]);
+      expect(matchesAllFilters(game6, { winner: null, playerCount: 6, players: [] })).toBe(true);
+      expect(matchesAllFilters(game6, { winner: null, playerCount: 4, players: [] })).toBe(false);
+    });
   });
 
   describe('players multi-select filter (D-17 OR-within)', () => {

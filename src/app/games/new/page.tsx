@@ -1,12 +1,16 @@
 "use client";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { GameForm, type GameFormPayload } from '@/app/games/game-form';
 
 type NotifyStatus = 'idle' | 'sending' | 'sent' | 'error';
 
+const PLAYER_COUNT_OPTIONS = [2, 3, 4, 5, 6, 7, 8] as const;
+
 export default function NewGamePage() {
   const router = useRouter();
+  const [playerCount, setPlayerCount] = useState<number | null>(null);
   const [createdGameId, setCreatedGameId] = useState<string | null>(null);
   const [notifyStatus, setNotifyStatus] = useState<NotifyStatus>('idle');
 
@@ -48,6 +52,7 @@ export default function NewGamePage() {
     router.refresh();
   };
 
+  // ----- Post-save Discord notify modal (unchanged) -----
   if (createdGameId !== null) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -97,10 +102,49 @@ export default function NewGamePage() {
     );
   }
 
+  // ----- Player-count popup gate -----
+  if (playerCount === null) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="player-count-title"
+      >
+        <div className="bg-surface border border-border rounded-lg p-8 max-w-md w-full mx-4 shadow-xl">
+          <h2 id="player-count-title" className="text-xl font-bold text-foreground mb-4">
+            How many players?
+          </h2>
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {PLAYER_COUNT_OPTIONS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPlayerCount(n)}
+                className="py-3 rounded-md border border-border bg-surface text-foreground font-medium hover:bg-accent hover:text-background transition-colors min-h-[44px]"
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <Link
+            href="/games"
+            className="block text-center text-sm text-muted underline hover:text-foreground"
+          >
+            Cancel
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ----- Form (count locked once chosen) -----
   return (
     <main className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-foreground mb-4">Log a game</h1>
-      <GameForm onSubmit={handleSubmit} submitLabel="Save game" />
+      <h1 className="text-2xl font-bold text-foreground mb-4">
+        Log a {playerCount}-player game
+      </h1>
+      <GameForm playerCount={playerCount} onSubmit={handleSubmit} submitLabel="Save game" />
     </main>
   );
 }

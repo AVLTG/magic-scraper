@@ -13,8 +13,8 @@ export interface GameFormState {
   date: string; // yyyy-mm-dd
   notes: string;
   wonByCombo: boolean;
-  rows: ParticipantRow[]; // always length 4
-  winnerIndex: number; // 0..3 or -1
+  rows: ParticipantRow[]; // length matches playerCount (2..8)
+  winnerIndex: number; // 0..rows.length-1 or -1
 }
 
 export interface GameFormPayload {
@@ -39,20 +39,10 @@ export type ValidationResult =
   | { ok: true; payload: GameFormPayload }
   | { ok: false; errors: GameFormErrors };
 
-/** Pure helper: strip rows whose playerName is empty/whitespace. */
-export function filterEmptyRows(rows: ParticipantRow[]): ParticipantRow[] {
-  return rows.filter((r) => r.playerName.trim() !== '');
-}
-
 /**
  * Phase 6.1 D-10, D-11: derive the list of already-filled player names from all rows
  * EXCEPT the caller's own row. Used to populate the `excludeItems` prop on each row's
  * player-name Combobox so the dropdown hides names already in use by other participants.
- *
- * - Row's own current value is NOT included (D-11 — editing a filled row shouldn't hide
- *   the player from themselves)
- * - Whitespace-only names are treated as empty
- * - Names are trimmed before inclusion
  */
 export function excludeItemsForRow(
   rowIndex: number,
@@ -64,7 +54,11 @@ export function excludeItemsForRow(
     .map((r) => r.name);
 }
 
-/** Pure helper: validate form state and return either an error map or a ready-to-POST payload. */
+/**
+ * Strict validation (2026-05-15): every row must be filled. The form's row count
+ * is locked by the player-count popup on new games and by saved data on edit.
+ * Empty rows are NOT silently dropped — they're a validation error.
+ */
 export function validateGameForm(state: GameFormState): ValidationResult {
   const errors: GameFormErrors = {};
 
@@ -72,25 +66,18 @@ export function validateGameForm(state: GameFormState): ValidationResult {
     errors.date = 'Date is required';
   }
 
-  // Track original indices so we can map winnerIndex after filtering
-  const filled = state.rows
-    .map((r, i) => ({ ...r, _originalIndex: i }))
-    .filter((r) => r.playerName.trim() !== '');
-
-  if (filled.length === 0) {
-    errors.form = 'At least one participant required';
+  const allFilled = state.rows.every((r) => r.playerName.trim() !== '');
+  if (!allFilled) {
+    errors.form = `All ${state.rows.length} participant names are required`;
   }
 
-  // Winner must be one of the filled rows (Pitfall 4)
-  const winnerFilledIndex = filled.findIndex((r) => r._originalIndex === state.winnerIndex);
-  if (winnerFilledIndex === -1 && !errors.form) {
+  if (
+    !errors.form &&
+    (state.winnerIndex < 0 || state.winnerIndex >= state.rows.length)
+  ) {
     errors.form = 'Exactly one winner required';
-  } else if (winnerFilledIndex === -1 && filled.length === 0) {
-    // Already reported as "at least one participant"; still mark winner missing
-    errors.form = errors.form ?? 'Exactly one winner required';
   }
 
-  // Length caps (server-side zod re-validates; this is for UX feedback)
   const rowErrors: Record<number, string> = {};
   state.rows.forEach((r, i) => {
     if (r.playerName.length > 100) rowErrors[i] = 'Player name too long (max 100)';
@@ -102,9 +89,9 @@ export function validateGameForm(state: GameFormState): ValidationResult {
     return { ok: false, errors };
   }
 
-  const participants = filled.map((r) => ({
+  const participants = state.rows.map((r, i) => ({
     playerName: r.playerName.trim(),
-    isWinner: r._originalIndex === state.winnerIndex,
+    isWinner: i === state.winnerIndex,
     isScrewed: r.isScrewed,
     deckName: r.deckName.trim() === '' ? undefined : r.deckName.trim(),
   }));
@@ -131,17 +118,13 @@ export function buildInitialState(game: {
   notes: string | null;
   participants: { playerName: string; isWinner: boolean; isScrewed: boolean; deckName: string | null }[];
 }): GameFormState {
-  const rows: ParticipantRow[] = [emptyRow(), emptyRow(), emptyRow(), emptyRow()];
-  let winnerIndex = -1;
-  game.participants.slice(0, 4).forEach((p, i) => {
-    rows[i] = {
-      playerName: p.playerName,
-      deckName: p.deckName ?? '',
-      isWinner: p.isWinner,
-      isScrewed: p.isScrewed,
-    };
-    if (p.isWinner) winnerIndex = i;
-  });
+  const rows: ParticipantRow[] = game.participants.map((p) => ({
+    playerName: p.playerName,
+    deckName: p.deckName ?? '',
+    isWinner: p.isWinner,
+    isScrewed: p.isScrewed,
+  }));
+  const winnerIndex = game.participants.findIndex((p) => p.isWinner);
   const dateStr =
     typeof game.date === 'string'
       ? new Date(game.date).toISOString().slice(0, 10)
@@ -156,12 +139,13 @@ export function buildInitialState(game: {
 }
 
 export interface GameFormProps {
+  playerCount: number;
   initial?: GameFormState;
   submitLabel?: string;
   onSubmit: (payload: GameFormPayload) => Promise<void> | void;
 }
 
-export function GameForm({ initial, submitLabel = 'Save game', onSubmit }: GameFormProps) {
+export function GameForm({ playerCount, initial, submitLabel = 'Save game', onSubmit }: GameFormProps) {
   const [state, setState] = useState<GameFormState>(
     initial ?? {
       // en-CA locale formats dates as YYYY-MM-DD and respects the viewer's
@@ -171,7 +155,7 @@ export function GameForm({ initial, submitLabel = 'Save game', onSubmit }: GameF
       date: new Date().toLocaleDateString('en-CA'),
       notes: '',
       wonByCombo: false,
-      rows: [emptyRow(), emptyRow(), emptyRow(), emptyRow()],
+      rows: Array.from({ length: playerCount }, emptyRow),
       winnerIndex: -1,
     }
   );
@@ -181,7 +165,6 @@ export function GameForm({ initial, submitLabel = 'Save game', onSubmit }: GameF
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
 
-  // Seed autocomplete once on mount (D-09 — no debounce, no refresh)
   useEffect(() => {
     let cancelled = false;
     (async () => {

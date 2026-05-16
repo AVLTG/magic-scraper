@@ -14,6 +14,8 @@ import {
   computeWinsByPlayerPie,
   computeGamesByDeckPie,
   computePlayerRadar,
+  filterGamesByTimeframe,
+  type Timeframe,
 } from '@/lib/stats';
 
 // ---------------------------------------------------------------------------
@@ -127,6 +129,7 @@ export default function StatsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set());
+  const [timeframe, setTimeframe] = useState<Timeframe>('3M');
 
   // ---------- Fetch on mount ----------
   useEffect(() => {
@@ -161,12 +164,24 @@ export default function StatsPage() {
   const playerWinRate = useMemo(() => computePlayerWinRate(games), [games]);
   const deckWinRate = useMemo(() => computeDeckWinRate(games), [games]);
   const screwedRate = useMemo(() => computeScrewedRate(games), [games]);
-  const weeklyFrequency = useMemo(() => computeWeeklyFrequency(games), [games]);
-  const mostLikelyToPlay = useMemo(() => computeMostLikelyToPlay(games), [games]);
-  const mostLikelyBump = useMemo(() => computeMostLikelyToPlayBump(games), [games]);
   const winsByPlayer = useMemo(() => computeWinsByPlayerPie(games), [games]);
   const gamesByDeck = useMemo(() => computeGamesByDeckPie(games), [games]);
   const playerRadar = useMemo(() => computePlayerRadar(games), [games]);
+
+  // Frequency-section charts: filtered by the active timeframe (2026-05-15)
+  const frequencyGames = useMemo(
+    () => filterGamesByTimeframe(games, timeframe),
+    [games, timeframe]
+  );
+  const weeklyFrequency = useMemo(() => computeWeeklyFrequency(frequencyGames), [frequencyGames]);
+  const mostLikelyBump = useMemo(
+    () => computeMostLikelyToPlayBump(frequencyGames),
+    [frequencyGames]
+  );
+  const mostLikelyToPlayFiltered = useMemo(
+    () => computeMostLikelyToPlay(frequencyGames),
+    [frequencyGames]
+  );
 
   // ---------- Chart chrome tokens (reactive to light/dark toggle) ----------
   const readTokens = useCallback(() => {
@@ -239,8 +254,8 @@ export default function StatsPage() {
         return `Avg ${avg} games/week`;
       }
       case CHART_IDS.LIKELY_BUMP:
-        return mostLikelyToPlay.length > 0
-          ? `#1: ${mostLikelyToPlay[0].player} ${Math.round(mostLikelyToPlay[0].rate * 100)}%`
+        return mostLikelyToPlayFiltered.length > 0
+          ? `#1: ${mostLikelyToPlayFiltered[0].player} ${Math.round(mostLikelyToPlayFiltered[0].rate * 100)}%`
           : 'No data yet';
       default:
         return '';
@@ -349,7 +364,27 @@ export default function StatsPage() {
 
           {/* Section 4: Frequency */}
           <section className="mb-12">
-            <h2 className="text-xl font-bold text-foreground tracking-tight mb-4">Frequency</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h2 className="text-xl font-bold text-foreground tracking-tight">Frequency</h2>
+              <div className="inline-flex rounded-md border border-border bg-surface p-1" role="group" aria-label="Timeframe">
+                {(['1M', '3M', '1Y', '3Y', 'all'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTimeframe(t)}
+                    aria-pressed={timeframe === t}
+                    className={
+                      'px-3 py-1.5 text-xs font-medium rounded ' +
+                      (timeframe === t
+                        ? 'bg-accent text-background'
+                        : 'text-muted hover:text-foreground')
+                    }
+                  >
+                    {t === 'all' ? 'All' : t}
+                  </button>
+                ))}
+              </div>
+            </div>
             <ChartSection
               id={CHART_IDS.WEEKLY_FREQ}
               title="Games per week"

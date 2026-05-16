@@ -11,6 +11,8 @@ import {
   computeWinsByPlayerPie,
   computeGamesByDeckPie,
   computePlayerRadar,
+  filterGamesByTimeframe,
+  type Timeframe,
 } from '@/lib/stats';
 
 // ---------------------------------------------------------------------------
@@ -393,6 +395,43 @@ describe('computeGamesByDeckPie', () => {
   });
 });
 
+describe('computeGamesByDeckPie — top 15, no Other (2026-05-15)', () => {
+  function deckGame(deck: string): Game {
+    return mkGame('2026-04-01', [
+      mkParticipant('P', { isWinner: true, deckName: deck }),
+    ]);
+  }
+
+  it('returns all 15 decks when exactly 15 distinct decks exist', () => {
+    const games = Array.from({ length: 15 }, (_, i) => deckGame(`Deck${i}`));
+    const result = computeGamesByDeckPie(games);
+    expect(result).toHaveLength(15);
+    expect(result.find((d) => d.deck === 'Other')).toBeUndefined();
+  });
+
+  it('returns top 15 with NO Other bucket when 16+ decks exist', () => {
+    const games: Game[] = [];
+    for (let i = 0; i < 20; i++) {
+      // Deck i played (i+1) times so order is stable: Deck19 most, Deck0 least
+      for (let j = 0; j <= i; j++) games.push(deckGame(`Deck${i}`));
+    }
+    const result = computeGamesByDeckPie(games);
+    expect(result).toHaveLength(15);
+    expect(result.find((d) => d.deck === 'Other')).toBeUndefined();
+    // Top entries are the highest-count decks
+    expect(result[0].deck).toBe('Deck19');
+    expect(result[0].games).toBe(20);
+    expect(result[14].deck).toBe('Deck5');
+  });
+
+  it('returns fewer than 15 entries unchanged when only N<15 decks exist', () => {
+    const games = Array.from({ length: 5 }, (_, i) => deckGame(`Deck${i}`));
+    const result = computeGamesByDeckPie(games);
+    expect(result).toHaveLength(5);
+    expect(result.find((d) => d.deck === 'Other')).toBeUndefined();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // computePlayerRadar
 // ---------------------------------------------------------------------------
@@ -436,5 +475,64 @@ describe('computePlayerRadar', () => {
     const bob = result.find((r) => r.player === 'Bob')!;
     // game2: wonByCombo, Bob wins, not imported -> 1
     expect(bob.wonByCombo).toBe(1);
+  });
+});
+
+describe('filterGamesByTimeframe (2026-05-15)', () => {
+  const NOW = new Date('2026-05-15T12:00:00Z').getTime();
+  let dateNowSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(NOW);
+  });
+
+  afterEach(() => {
+    dateNowSpy.mockRestore();
+  });
+
+  function gameOnDay(daysAgo: number): Game {
+    const d = new Date(NOW - daysAgo * 86_400_000);
+    return mkGame(d.toISOString().slice(0, 10), [
+      mkParticipant('P', { isWinner: true }),
+    ]);
+  }
+
+  it('returns input unchanged for "all"', () => {
+    const games = [gameOnDay(0), gameOnDay(100), gameOnDay(2000)];
+    expect(filterGamesByTimeframe(games, 'all')).toHaveLength(3);
+  });
+
+  it('1M keeps games within 30 days', () => {
+    const games = [gameOnDay(0), gameOnDay(15), gameOnDay(29), gameOnDay(31), gameOnDay(100)];
+    const result = filterGamesByTimeframe(games, '1M');
+    expect(result).toHaveLength(3);
+  });
+
+  it('3M keeps games within 90 days', () => {
+    const games = [gameOnDay(0), gameOnDay(89), gameOnDay(91), gameOnDay(365)];
+    const result = filterGamesByTimeframe(games, '3M');
+    expect(result).toHaveLength(2);
+  });
+
+  it('1Y keeps games within 365 days', () => {
+    const games = [gameOnDay(0), gameOnDay(364), gameOnDay(366), gameOnDay(1000)];
+    const result = filterGamesByTimeframe(games, '1Y');
+    expect(result).toHaveLength(2);
+  });
+
+  it('3Y keeps games within 1095 days', () => {
+    const games = [gameOnDay(0), gameOnDay(1094), gameOnDay(1096)];
+    const result = filterGamesByTimeframe(games, '3Y');
+    expect(result).toHaveLength(2);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(filterGamesByTimeframe([], '3M')).toEqual([]);
+    expect(filterGamesByTimeframe([], 'all')).toEqual([]);
+  });
+
+  it('Timeframe type accepts only the five expected values', () => {
+    const valid: Timeframe[] = ['1M', '3M', '1Y', '3Y', 'all'];
+    expect(valid).toHaveLength(5);
   });
 });
