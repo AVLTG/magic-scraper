@@ -115,13 +115,13 @@ export default function NewGamePage() {
           <h2 id="player-count-title" className="text-xl font-bold text-foreground mb-4">
             How many players?
           </h2>
-          <div className="grid grid-cols-4 gap-2 mb-4">
+          <div className="flex flex-wrap justify-center gap-2 mb-4">
             {PLAYER_COUNT_OPTIONS.map((n) => (
               <button
                 key={n}
                 type="button"
                 onClick={() => setPlayerCount(n)}
-                className="py-3 rounded-md border border-border bg-surface text-foreground font-medium hover:bg-accent hover:text-background transition-colors min-h-[44px]"
+                className="basis-[calc((100%-1.5rem)/4)] py-3 rounded-md border border-border bg-surface text-foreground font-medium hover:bg-accent hover:text-background transition-colors min-h-[44px]"
               >
                 {n}
               </button>

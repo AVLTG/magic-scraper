@@ -332,7 +332,13 @@ export default function StatsPage() {
           {/* Section 3: Breakdowns */}
           <section className="mb-12">
             <h2 className="text-xl font-bold text-foreground tracking-tight mb-4">Breakdowns</h2>
-            <div className="sm:grid sm:grid-cols-2 sm:gap-6">
+            {(() => {
+              // Equalize Breakdowns row height so the Games-by-deck pie expands
+              // to match the (taller, data-driven) Wins-by-player bar chart and
+              // doesn't leave empty space at the bottom of its card.
+              const breakdownsHeight = Math.max(320, winsByPlayer.length * 40);
+              return (
+              <div className="sm:grid sm:grid-cols-2 sm:gap-6">
               <ChartSection
                 id={CHART_IDS.WINS_BY_PLAYER_PIE}
                 title="Wins by player"
@@ -341,7 +347,7 @@ export default function StatsPage() {
                 onToggle={() => toggleChart(CHART_IDS.WINS_BY_PLAYER_PIE)}
               >
                 {winsByPlayer.length > 0 ? (
-                  <WinsByPlayerPie data={winsByPlayer} chartTokens={chartTokens} />
+                  <WinsByPlayerPie data={winsByPlayer} chartTokens={chartTokens} height={breakdownsHeight} />
                 ) : (
                   <EmptyChart />
                 )}
@@ -349,17 +355,20 @@ export default function StatsPage() {
               <ChartSection
                 id={CHART_IDS.GAMES_BY_DECK_PIE}
                 title="Games by deck"
+                description="Showing top 15 decks"
                 summary={getSummary(CHART_IDS.GAMES_BY_DECK_PIE)}
                 expanded={expandedCharts.has(CHART_IDS.GAMES_BY_DECK_PIE)}
                 onToggle={() => toggleChart(CHART_IDS.GAMES_BY_DECK_PIE)}
               >
                 {gamesByDeck.length > 0 ? (
-                  <GamesByDeckPie data={gamesByDeck} chartTokens={chartTokens} />
+                  <GamesByDeckPie data={gamesByDeck} chartTokens={chartTokens} height={breakdownsHeight} />
                 ) : (
                   <EmptyChart />
                 )}
               </ChartSection>
             </div>
+              );
+            })()}
           </section>
 
           {/* Section 4: Frequency */}

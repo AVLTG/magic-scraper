@@ -26,13 +26,14 @@ interface WinsByPlayerDatum {
 interface Props {
   data: WinsByPlayerDatum[];
   chartTokens: ChartTokens;
+  height?: number;
 }
 
-export default function WinsByPlayerPie({ data, chartTokens }: Props) {
-  const height = Math.max(200, data.length * 40);
+export default function WinsByPlayerPie({ data, chartTokens, height }: Props) {
+  const resolvedHeight = height ?? Math.max(200, data.length * 40);
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={resolvedHeight}>
       <BarChart layout="vertical" data={data} margin={{ left: 60 }}>
         <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={chartTokens.border} />
         <XAxis type="number" tick={{ fontSize: 12, fill: chartTokens.muted }} />
