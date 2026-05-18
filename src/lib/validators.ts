@@ -20,6 +20,7 @@ export const gameParticipantSchema = z.object({
     .max(100, 'playerName too long'),
   isWinner: z.boolean(),
   isScrewed: z.boolean(),
+  isRandom: z.boolean().default(false),
   deckName: z
     .string()
     .trim()
@@ -51,8 +52,12 @@ const baseGameSchema = z.object({
     .min(1, 'at least one participant required')
     .max(8, 'at most eight participants per game')
     .refine(
-      (arr) => new Set(arr.map((p) => p.playerName.toLowerCase())).size === arr.length,
-      { message: 'duplicate player names not allowed' }
+      (arr) => {
+        const regulars = arr.filter((p) => !p.isRandom);
+        const names = new Set(regulars.map((p) => p.playerName.toLowerCase()));
+        return names.size === regulars.length;
+      },
+      { message: 'duplicate player names not allowed (non-random rows)' }
     ),
 });
 

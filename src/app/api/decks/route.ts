@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const rows = await prisma.gameParticipant.findMany({
       select: { deckName: true },
       distinct: ['deckName'],
-      where: { deckName: { not: null } },
+      where: { deckName: { not: null }, isRandom: false },
     });
     const decks = Array.from(
       new Set(

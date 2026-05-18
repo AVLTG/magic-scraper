@@ -11,7 +11,8 @@ function mkParticipant(
   playerName: string,
   isWinner = false,
   isScrewed = false,
-  deckName: string | null = null
+  deckName: string | null = null,
+  isRandom = false
 ) {
   return {
     id: `p-${playerName}`,
@@ -19,6 +20,7 @@ function mkParticipant(
     playerName,
     isWinner,
     isScrewed,
+    isRandom,
     deckName,
   };
 }
@@ -300,5 +302,87 @@ describe('deriveDeckOptions', () => {
       ]),
     ];
     expect(deriveDeckOptions(games)).toEqual(['Selvala']);
+  });
+});
+
+describe('derive*Options with random participants', () => {
+  it('deriveWinnerOptions returns "Random" instead of the real name when a random wins', () => {
+    const g1 = mkGame('g1', [mkParticipant('Conny', true, false, 'Atraxa', true), mkParticipant('Bob')]);
+    expect(deriveWinnerOptions([g1])).toEqual(['Random']);
+  });
+
+  it('derivePlayerOptions returns "Random" instead of the real name for random participants', () => {
+    const g1 = mkGame('g1', [
+      mkParticipant('Alice', true),
+      mkParticipant('Conny', false, false, 'Atraxa', true),
+    ]);
+    expect(derivePlayerOptions([g1])).toEqual(['Alice', 'Random']);
+  });
+
+  it('derivePlayerOptions deduplicates multiple randoms across games into one "Random"', () => {
+    const g1 = mkGame('g1', [
+      mkParticipant('Alice', true),
+      mkParticipant('Conny', false, false, null, true),
+    ]);
+    const g2 = mkGame('g2', [
+      mkParticipant('Bob', true),
+      mkParticipant('Dave', false, false, null, true),
+    ]);
+    expect(derivePlayerOptions([g1, g2])).toEqual(['Alice', 'Bob', 'Random']);
+  });
+
+  it('deriveDeckOptions skips random participants entirely', () => {
+    const g1 = mkGame('g1', [
+      mkParticipant('Alice', true, false, 'Atraxa'),
+      mkParticipant('Conny', false, false, 'Selvala', true),
+    ]);
+    expect(deriveDeckOptions([g1])).toEqual(['Atraxa']);
+  });
+
+  it('a real player who ONLY ever played as random does NOT appear in derivePlayerOptions', () => {
+    const g1 = mkGame('g1', [
+      mkParticipant('Alice', true),
+      mkParticipant('Conny', false, false, null, true),
+    ]);
+    expect(derivePlayerOptions([g1])).not.toContain('Conny');
+  });
+});
+
+describe('matchesAllFilters — random handling', () => {
+  const aliceVsRandom = mkGame('g1', [
+    mkParticipant('Alice', true, false, 'Atraxa'),
+    mkParticipant('Conny', false, false, 'Selvala', true),
+  ]);
+  const randomWins = mkGame('g2', [
+    mkParticipant('Alice', false),
+    mkParticipant('Conny', true, false, 'Selvala', true),
+  ]);
+  const allRandom = mkGame('g3', [
+    mkParticipant('Conny', true, false, 'Atraxa', true),
+    mkParticipant('Eve', false, false, 'Selvala', true),
+  ]);
+
+  it('winner filter "Random" matches games where any random won', () => {
+    expect(matchesAllFilters(randomWins, { ...EMPTY_FILTERS, winner: 'Random' })).toBe(true);
+    expect(matchesAllFilters(allRandom, { ...EMPTY_FILTERS, winner: 'Random' })).toBe(true);
+    expect(matchesAllFilters(aliceVsRandom, { ...EMPTY_FILTERS, winner: 'Random' })).toBe(false);
+  });
+
+  it('winner filter does NOT match the real name of a random winner', () => {
+    expect(matchesAllFilters(randomWins, { ...EMPTY_FILTERS, winner: 'Conny' })).toBe(false);
+  });
+
+  it('players filter "Random" matches games with any random participant', () => {
+    expect(matchesAllFilters(aliceVsRandom, { ...EMPTY_FILTERS, players: ['Random'] })).toBe(true);
+    expect(matchesAllFilters(allRandom, { ...EMPTY_FILTERS, players: ['Random'] })).toBe(true);
+  });
+
+  it('players filter does NOT match the real name of a random participant', () => {
+    expect(matchesAllFilters(aliceVsRandom, { ...EMPTY_FILTERS, players: ['Conny'] })).toBe(false);
+  });
+
+  it('decks filter ignores decks played only by randoms', () => {
+    expect(matchesAllFilters(aliceVsRandom, { ...EMPTY_FILTERS, decks: ['Selvala'] })).toBe(false);
+    expect(matchesAllFilters(aliceVsRandom, { ...EMPTY_FILTERS, decks: ['Atraxa'] })).toBe(true);
   });
 });

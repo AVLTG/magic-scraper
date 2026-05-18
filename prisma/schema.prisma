@@ -61,6 +61,7 @@ model GameParticipant {
   playerName  String
   isWinner    Boolean
   isScrewed   Boolean
+  isRandom    Boolean @default(false)
   deckName    String?
   role        String?
 

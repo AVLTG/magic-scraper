@@ -1,22 +1,17 @@
 import {
   excludeItemsForRow,
   validateGameForm,
+  buildInitialState,
 } from '../src/app/games/game-form';
 import type {
   GameFormState,
   GameVariant,
   ParticipantRole,
+  ParticipantRow,
 } from '../src/app/games/game-form';
 
-type ParticipantRow = {
-  playerName: string;
-  deckName: string;
-  isWinner: boolean;
-  isScrewed: boolean;
-};
-
 function row(playerName: string, extra: Partial<ParticipantRow> = {}): ParticipantRow {
-  return { playerName, deckName: '', isWinner: false, isScrewed: false, ...extra };
+  return { playerName, deckName: '', isWinner: false, isScrewed: false, isRandom: false, ...extra };
 }
 
 function baseState(
@@ -390,5 +385,79 @@ describe('variantQuestionForCount — gate helper', () => {
         label: 'Was this a King Commander game?',
       });
     }
+  });
+});
+
+describe('excludeItemsForRow — isRandom interaction', () => {
+  it('returns empty array when the caller row is random', () => {
+    const state = {
+      rows: [
+        row('Alice'),
+        row('Bob'),
+        row('Conny', { isRandom: true }),
+      ],
+    };
+    expect(excludeItemsForRow(2, state)).toEqual([]);
+  });
+
+  it('excludes non-random rows from the dedupe set when caller is non-random', () => {
+    const state = {
+      rows: [
+        row('Alice'),
+        row('Conny', { isRandom: true }),
+        row('Bob'),
+      ],
+    };
+    // Caller is row 0 (non-random). Should see only the OTHER non-random row's name.
+    expect(excludeItemsForRow(0, state)).toEqual(['Bob']);
+  });
+});
+
+describe('validateGameForm — isRandom payload', () => {
+  it('includes isRandom on each participant in the payload', () => {
+    const state = baseState(
+      [
+        row('Alice', { isWinner: true }),
+        row('Conny', { isRandom: true }),
+      ],
+      0
+    );
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.participants[0].isRandom).toBe(false);
+      expect(result.payload.participants[1].isRandom).toBe(true);
+    }
+  });
+});
+
+describe('buildInitialState — isRandom hydration', () => {
+  it('hydrates isRandom from the loaded game', () => {
+    const game = {
+      date: '2026-05-01T00:00:00.000Z',
+      wonByCombo: false,
+      notes: null,
+      participants: [
+        { playerName: 'Alice', isWinner: true, isScrewed: false, isRandom: false, deckName: 'Atraxa' },
+        { playerName: 'Conny', isWinner: false, isScrewed: false, isRandom: true, deckName: 'Selvala' },
+      ],
+    };
+    const state = buildInitialState(game);
+    expect(state.rows[0].isRandom).toBe(false);
+    expect(state.rows[1].isRandom).toBe(true);
+  });
+
+  it('defaults isRandom to false when the API row omits it', () => {
+    const game = {
+      date: '2026-05-01T00:00:00.000Z',
+      wonByCombo: false,
+      notes: null,
+      participants: [
+        // Legacy row missing the field
+        { playerName: 'Alice', isWinner: true, isScrewed: false, deckName: 'Atraxa' } as any,
+      ],
+    };
+    const state = buildInitialState(game);
+    expect(state.rows[0].isRandom).toBe(false);
   });
 });

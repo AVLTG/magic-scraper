@@ -13,6 +13,7 @@ export async function GET(request: Request) {
   try {
     const [participants, users] = await Promise.all([
       prisma.gameParticipant.findMany({
+        where: { isRandom: false },
         select: { playerName: true },
         distinct: ['playerName'],
       }),

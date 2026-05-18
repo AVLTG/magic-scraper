@@ -9,6 +9,7 @@ interface Participant {
   playerName: string;
   isWinner: boolean;
   isScrewed: boolean;
+  isRandom: boolean;
   deckName: string | null;
 }
 
@@ -41,20 +42,29 @@ export interface FilterState {
  */
 export function matchesAllFilters(game: Game, filters: FilterState): boolean {
   if (filters.winner !== null) {
-    const winner = game.participants.find((p) => p.isWinner);
-    if (!winner || winner.playerName !== filters.winner) return false;
+    if (filters.winner === 'Random') {
+      const anyRandomWon = game.participants.some((p) => p.isWinner && p.isRandom);
+      if (!anyRandomWon) return false;
+    } else {
+      const winner = game.participants.find((p) => p.isWinner && !p.isRandom);
+      if (!winner || winner.playerName !== filters.winner) return false;
+    }
   }
   if (filters.playerCount !== null) {
     if (game.participants.length !== filters.playerCount) return false;
   }
   if (filters.players.length > 0) {
-    const names = new Set(game.participants.map((p) => p.playerName));
-    const anyMatch = filters.players.some((p) => names.has(p));
+    const buckets = new Set<string>();
+    for (const p of game.participants) {
+      buckets.add(p.isRandom ? 'Random' : p.playerName);
+    }
+    const anyMatch = filters.players.some((p) => buckets.has(p));
     if (!anyMatch) return false;
   }
   if (filters.decks.length > 0) {
     const usedDecks = new Set(
       game.participants
+        .filter((p) => !p.isRandom)
         .map((p) => p.deckName?.trim())
         .filter((d): d is string => !!d && d !== '')
     );
@@ -71,7 +81,7 @@ export function deriveWinnerOptions(games: Game[]): string[] {
   const set = new Set<string>();
   for (const g of games) {
     for (const p of g.participants) {
-      if (p.isWinner) set.add(p.playerName);
+      if (p.isWinner) set.add(p.isRandom ? 'Random' : p.playerName);
     }
   }
   return Array.from(set).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -84,7 +94,7 @@ export function derivePlayerOptions(games: Game[]): string[] {
   const set = new Set<string>();
   for (const g of games) {
     for (const p of g.participants) {
-      set.add(p.playerName);
+      set.add(p.isRandom ? 'Random' : p.playerName);
     }
   }
   return Array.from(set).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -99,6 +109,7 @@ export function deriveDeckOptions(games: Game[]): string[] {
   const set = new Set<string>();
   for (const g of games) {
     for (const p of g.participants) {
+      if (p.isRandom) continue;
       const trimmed = p.deckName?.trim();
       if (trimmed) set.add(trimmed);
     }
@@ -395,9 +406,17 @@ export default function GamesPage() {
                   >
                     <td className="py-2 pr-4 text-sm text-foreground">{formatDate(g.date)}</td>
                     <td className="py-2 pr-4 text-sm text-foreground">
-                      {winner
-                        ? `${winner.playerName}${winner.deckName ? ` (${winner.deckName})` : ''}`
-                        : '—'}
+                      {winner ? (
+                        <>
+                          {winner.playerName}
+                          {winner.isRandom && (
+                            <span aria-label="Random player" title="Random player"> ★</span>
+                          )}
+                          {winner.deckName ? ` (${winner.deckName})` : ''}
+                        </>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="py-2 pr-4 text-sm text-foreground">{g.participants.length}</td>
                     <td className="py-2 pr-4 text-sm text-muted truncate max-w-xs hidden sm:table-cell">
@@ -425,7 +444,12 @@ export default function GamesPage() {
                         <ul className="space-y-1 text-sm">
                           {g.participants.map((p) => (
                             <li key={p.id} className="flex items-center gap-3">
-                              <span className="font-medium text-foreground">{p.playerName}</span>
+                              <span className="font-medium text-foreground">
+                                {p.playerName}
+                                {p.isRandom && (
+                                  <span aria-label="Random player" title="Random player"> ★</span>
+                                )}
+                              </span>
                               {p.deckName && <span className="text-muted">({p.deckName})</span>}
                               {p.isWinner && (
                                 <span className="text-green-600 text-xs">WINNER</span>

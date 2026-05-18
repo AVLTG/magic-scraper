@@ -10,6 +10,7 @@ export interface ParticipantRow {
   deckName: string;
   isWinner: boolean;
   isScrewed: boolean;
+  isRandom: boolean;
 }
 
 export type WinningTeam = 'ROYALTY' | 'ASSASSINS';
@@ -35,6 +36,7 @@ export interface GameFormPayload {
     playerName: string;
     isWinner: boolean;
     isScrewed: boolean;
+    isRandom: boolean;
     deckName?: string;
     role?: ParticipantRole;
   }[];
@@ -59,10 +61,14 @@ export function excludeItemsForRow(
   rowIndex: number,
   state: { rows: ParticipantRow[] }
 ): string[] {
+  // Random rows can share names with anyone, so they neither contribute to
+  // nor consume the dedupe set.
+  if (state.rows[rowIndex]?.isRandom) return [];
+
   return state.rows
-    .map((r, i) => ({ name: r.playerName.trim(), i }))
-    .filter((r) => r.i !== rowIndex && r.name.length > 0)
-    .map((r) => r.name);
+    .map((r, i) => ({ row: r, i }))
+    .filter((entry) => entry.i !== rowIndex && !entry.row.isRandom && entry.row.playerName.trim().length > 0)
+    .map((entry) => entry.row.playerName.trim());
 }
 
 /**
@@ -136,6 +142,7 @@ export function validateGameForm(state: GameFormState): ValidationResult {
       playerName: r.playerName.trim(),
       isWinner,
       isScrewed: r.isScrewed,
+      isRandom: r.isRandom,
       deckName: r.deckName.trim() === '' ? undefined : r.deckName.trim(),
       role,
     };
@@ -154,7 +161,7 @@ export function validateGameForm(state: GameFormState): ValidationResult {
 }
 
 function emptyRow(): ParticipantRow {
-  return { playerName: '', deckName: '', isWinner: false, isScrewed: false };
+  return { playerName: '', deckName: '', isWinner: false, isScrewed: false, isRandom: false };
 }
 
 /** Build a GameFormState from an API game response (for edit-mode pre-population). */
@@ -167,6 +174,7 @@ export function buildInitialState(game: {
     playerName: string;
     isWinner: boolean;
     isScrewed: boolean;
+    isRandom?: boolean;
     deckName: string | null;
     role?: ParticipantRole | null;
   }[];
@@ -177,6 +185,7 @@ export function buildInitialState(game: {
     deckName: p.deckName ?? '',
     isWinner: p.isWinner,
     isScrewed: p.isScrewed,
+    isRandom: p.isRandom ?? false,
   }));
   const winnerIndex = game.participants.findIndex((p) => p.isWinner);
   const winnerIndices = game.participants
@@ -469,14 +478,24 @@ export function GameForm({
                 ))}
               </div>
             )}
-            <label className="flex items-center gap-1 text-xs text-muted">
-              <input
-                type="checkbox"
-                checked={r.isScrewed}
-                onChange={(e) => updateRow(i, { isScrewed: e.target.checked })}
-              />
-              Screwed
-            </label>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 text-xs text-muted">
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={r.isScrewed}
+                  onChange={(e) => updateRow(i, { isScrewed: e.target.checked })}
+                />
+                Screwed
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={r.isRandom}
+                  onChange={(e) => updateRow(i, { isRandom: e.target.checked })}
+                />
+                Random
+              </label>
+            </div>
             {errors.rows?.[i] && (
               <p className="col-span-4 text-xs text-red-600">{errors.rows[i]}</p>
             )}

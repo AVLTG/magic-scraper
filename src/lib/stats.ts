@@ -10,6 +10,11 @@
 
 import type { Game } from '@/app/games/page';
 
+// Player-stat bucket name for participants flagged isRandom — single string
+// reused across every player-aggregating helper. Deck-aggregating helpers
+// skip random participants entirely (see D-26 in the random-players spec).
+const RANDOM_BUCKET = 'Random';
+
 // ---------------------------------------------------------------------------
 // Utility: ISO week helpers
 // ---------------------------------------------------------------------------
@@ -55,11 +60,22 @@ export function computePlayerWinRate(
 ): { player: string; wins: number; played: number; rate: number }[] {
   const map = new Map<string, { wins: number; played: number }>();
   for (const g of games) {
+    const playedBuckets = new Set<string>();
+    const winningBuckets = new Set<string>();
     for (const p of g.participants) {
-      const entry = map.get(p.playerName) ?? { wins: 0, played: 0 };
+      const key = p.isRandom ? RANDOM_BUCKET : p.playerName;
+      playedBuckets.add(key);
+      if (p.isWinner) winningBuckets.add(key);
+    }
+    for (const key of playedBuckets) {
+      const entry = map.get(key) ?? { wins: 0, played: 0 };
       entry.played++;
-      if (p.isWinner) entry.wins++;
-      map.set(p.playerName, entry);
+      map.set(key, entry);
+    }
+    for (const key of winningBuckets) {
+      const entry = map.get(key) ?? { wins: 0, played: 0 };
+      entry.wins++;
+      map.set(key, entry);
     }
   }
   return Array.from(map.entries())
@@ -87,6 +103,7 @@ export function computeDeckWinRate(
     let winnerDeck: string | null = null;
 
     for (const p of g.participants) {
+      if (p.isRandom) continue;
       const deck = p.deckName?.trim();
       if (!deck) continue;
       decksInGame.add(deck);
@@ -133,11 +150,22 @@ export function computeScrewedRate(
 ): { player: string; screwed: number; played: number; rate: number }[] {
   const map = new Map<string, { screwed: number; played: number }>();
   for (const g of games) {
+    const playedBuckets = new Set<string>();
+    const screwedBuckets = new Set<string>();
     for (const p of g.participants) {
-      const entry = map.get(p.playerName) ?? { screwed: 0, played: 0 };
+      const key = p.isRandom ? RANDOM_BUCKET : p.playerName;
+      playedBuckets.add(key);
+      if (p.isScrewed) screwedBuckets.add(key);
+    }
+    for (const key of playedBuckets) {
+      const entry = map.get(key) ?? { screwed: 0, played: 0 };
       entry.played++;
-      if (p.isScrewed) entry.screwed++;
-      map.set(p.playerName, entry);
+      map.set(key, entry);
+    }
+    for (const key of screwedBuckets) {
+      const entry = map.get(key) ?? { screwed: 0, played: 0 };
+      entry.screwed++;
+      map.set(key, entry);
     }
   }
   return Array.from(map.entries())
@@ -184,8 +212,12 @@ export function computeMostLikelyToPlay(
   const totalGames = games.length;
   const map = new Map<string, number>();
   for (const g of games) {
+    const buckets = new Set<string>();
     for (const p of g.participants) {
-      map.set(p.playerName, (map.get(p.playerName) ?? 0) + 1);
+      buckets.add(p.isRandom ? RANDOM_BUCKET : p.playerName);
+    }
+    for (const bucket of buckets) {
+      map.set(bucket, (map.get(bucket) ?? 0) + 1);
     }
   }
   return Array.from(map.entries())
@@ -231,8 +263,12 @@ export function computeMostLikelyToPlayBump(
     // Add all games in this week
     while (gameIdx < sorted.length && isoWeekStartUTC(sorted[gameIdx].date) === week) {
       cumulativeGames++;
+      const buckets = new Set<string>();
       for (const p of sorted[gameIdx].participants) {
-        cumulativeParticipations.set(p.playerName, (cumulativeParticipations.get(p.playerName) ?? 0) + 1);
+        buckets.add(p.isRandom ? RANDOM_BUCKET : p.playerName);
+      }
+      for (const bucket of buckets) {
+        cumulativeParticipations.set(bucket, (cumulativeParticipations.get(bucket) ?? 0) + 1);
       }
       gameIdx++;
     }
@@ -273,10 +309,13 @@ export function computeWinsByPlayerPie(
 ): { player: string; wins: number }[] {
   const map = new Map<string, number>();
   for (const g of games) {
+    const winningBuckets = new Set<string>();
     for (const p of g.participants) {
-      if (p.isWinner) {
-        map.set(p.playerName, (map.get(p.playerName) ?? 0) + 1);
-      }
+      if (!p.isWinner) continue;
+      winningBuckets.add(p.isRandom ? RANDOM_BUCKET : p.playerName);
+    }
+    for (const bucket of winningBuckets) {
+      map.set(bucket, (map.get(bucket) ?? 0) + 1);
     }
   }
   return Array.from(map.entries())
@@ -297,6 +336,7 @@ export function computeGamesByDeckPie(
   const map = new Map<string, number>();
   for (const g of nonImported) {
     for (const p of g.participants) {
+      if (p.isRandom) continue;
       const deck = p.deckName?.trim();
       if (!deck) continue;
       map.set(deck, (map.get(deck) ?? 0) + 1);
@@ -321,17 +361,42 @@ export function computePlayerRadar(
   games: Game[]
 ): { player: string; played: number; wins: number; screwed: number; wonByCombo: number; nonImportedPlayed: number; totalGames: number }[] {
   const totalGames = games.length;
-  const map = new Map<string, { played: number; wins: number; screwed: number; wonByCombo: number; nonImportedPlayed: number }>();
+  type Entry = { played: number; wins: number; screwed: number; wonByCombo: number; nonImportedPlayed: number };
+  const map = new Map<string, Entry>();
+
+  const getOrCreate = (key: string): Entry => {
+    let entry = map.get(key);
+    if (!entry) {
+      entry = { played: 0, wins: 0, screwed: 0, wonByCombo: 0, nonImportedPlayed: 0 };
+      map.set(key, entry);
+    }
+    return entry;
+  };
 
   for (const g of games) {
+    const playedBuckets = new Set<string>();
+    const winningBuckets = new Set<string>();
+    const screwedBuckets = new Set<string>();
+
     for (const p of g.participants) {
-      const entry = map.get(p.playerName) ?? { played: 0, wins: 0, screwed: 0, wonByCombo: 0, nonImportedPlayed: 0 };
-      entry.played++;
-      if (!g.isImported) entry.nonImportedPlayed++;
-      if (p.isWinner) entry.wins++;
-      if (p.isScrewed) entry.screwed++;
-      if (p.isWinner && g.wonByCombo && !g.isImported) entry.wonByCombo++;
-      map.set(p.playerName, entry);
+      const key = p.isRandom ? RANDOM_BUCKET : p.playerName;
+      playedBuckets.add(key);
+      if (p.isWinner) winningBuckets.add(key);
+      if (p.isScrewed) screwedBuckets.add(key);
+    }
+
+    for (const key of playedBuckets) {
+      const e = getOrCreate(key);
+      e.played++;
+      if (!g.isImported) e.nonImportedPlayed++;
+    }
+    for (const key of winningBuckets) {
+      const e = getOrCreate(key);
+      e.wins++;
+      if (g.wonByCombo && !g.isImported) e.wonByCombo++;
+    }
+    for (const key of screwedBuckets) {
+      getOrCreate(key).screwed++;
     }
   }
 
@@ -371,10 +436,13 @@ export function computeScrewedByPlayerBar(
 ): { player: string; screwed: number }[] {
   const map = new Map<string, number>();
   for (const g of games) {
+    const screwedBuckets = new Set<string>();
     for (const p of g.participants) {
-      if (p.isScrewed) {
-        map.set(p.playerName, (map.get(p.playerName) ?? 0) + 1);
-      }
+      if (!p.isScrewed) continue;
+      screwedBuckets.add(p.isRandom ? RANDOM_BUCKET : p.playerName);
+    }
+    for (const bucket of screwedBuckets) {
+      map.set(bucket, (map.get(bucket) ?? 0) + 1);
     }
   }
   return Array.from(map.entries())
@@ -398,6 +466,7 @@ export function computeScrewedByDeckPie(
   const map = new Map<string, number>();
   for (const g of nonImported) {
     for (const p of g.participants) {
+      if (p.isRandom) continue;
       if (!p.isScrewed) continue;
       const deck = p.deckName?.trim();
       if (!deck) continue;

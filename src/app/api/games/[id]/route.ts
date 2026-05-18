@@ -116,6 +116,7 @@ export async function PATCH(
           playerName: p.playerName,
           isWinner: p.isWinner,
           isScrewed: p.isScrewed,
+          isRandom: p.isRandom,
           deckName: p.deckName,
           role: p.role,
         })),

@@ -96,6 +96,15 @@ describe('GET /api/players', () => {
     expect(res.body.players.filter((p: string) => p === 'Alice')).toHaveLength(1);
     expect(res.body.players).toHaveLength(2);
   });
+
+  it('excludes random participants from the player list', async () => {
+    mockUserFindMany.mockResolvedValue([]);
+    mockParticipantFindMany.mockResolvedValue([{ playerName: 'Alice' }, { playerName: 'Bob' }]);
+    const res: any = await getPlayers(makeRequest());
+    expect(res.status).toBe(200);
+    const callArg = mockParticipantFindMany.mock.calls[0][0];
+    expect(callArg.where).toEqual(expect.objectContaining({ isRandom: false }));
+  });
 });
 
 describe('GET /api/decks', () => {
@@ -146,5 +155,13 @@ describe('GET /api/decks', () => {
     const res: any = await getDecks(makeRequest());
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'Failed to fetch decks' });
+  });
+
+  it('excludes random participants from the deck list', async () => {
+    mockParticipantFindMany.mockResolvedValue([{ deckName: 'Atraxa' }, { deckName: 'Selvala' }]);
+    const res: any = await getDecks(makeRequest());
+    expect(res.status).toBe(200);
+    const callArg = mockParticipantFindMany.mock.calls[0][0];
+    expect(callArg.where).toEqual(expect.objectContaining({ isRandom: false }));
   });
 });

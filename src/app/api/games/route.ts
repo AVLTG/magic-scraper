@@ -29,6 +29,7 @@ export async function POST(request: Request) {
           playerName: p.playerName,
           isWinner: p.isWinner,
           isScrewed: p.isScrewed,
+          isRandom: p.isRandom,
           deckName: p.deckName,
           role: p.role,
         })),

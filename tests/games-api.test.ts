@@ -88,7 +88,7 @@ describe('gameSchema duplicate-participant refine (D-14)', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       const messages = result.error.issues.map((i) => i.message);
-      expect(messages).toContain('duplicate player names not allowed');
+      expect(messages.some((m) => m.startsWith('duplicate player names not allowed'))).toBe(true);
     }
   });
 
@@ -103,7 +103,7 @@ describe('gameSchema duplicate-participant refine (D-14)', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       const messages = result.error.issues.map((i) => i.message);
-      expect(messages).toContain('duplicate player names not allowed');
+      expect(messages.some((m) => m.startsWith('duplicate player names not allowed'))).toBe(true);
     }
   });
 
@@ -373,6 +373,37 @@ describe('POST /api/games', () => {
     expect(participantRows.find((r: any) => r.playerName === 'K').role).toBe('KING');
     expect(participantRows.find((r: any) => r.playerName === 'S1').role).toBe('SQUIRE');
     expect(participantRows.find((r: any) => r.playerName === 'A1').role).toBe('ASSASSIN');
+  });
+
+  it('persists isRandom on each participant', async () => {
+    mockCheckRateLimit.mockReturnValue({ allowed: true });
+    const gameCreateSpy = jest.fn().mockResolvedValue({ id: 'g-rand' });
+    const participantCreateManySpy = jest.fn().mockResolvedValue({ count: 3 });
+    mockTransaction.mockImplementation(async (cb: any) =>
+      cb({
+        game: { create: gameCreateSpy },
+        gameParticipant: { createMany: participantCreateManySpy },
+      })
+    );
+
+    const body = {
+      date: new Date('2026-05-01').toISOString(),
+      participants: [
+        { playerName: 'Alice', isWinner: true, isScrewed: false, isRandom: false },
+        { playerName: 'Conny', isWinner: false, isScrewed: false, isRandom: true },
+        { playerName: 'Conny', isWinner: false, isScrewed: false, isRandom: true },
+      ],
+    };
+
+    const res: any = await POST(makeRequest(body));
+    expect(res.status).toBe(201);
+
+    const participantRows = participantCreateManySpy.mock.calls[0][0].data;
+    expect(participantRows).toHaveLength(3);
+    expect(participantRows.find((r: any) => r.playerName === 'Alice').isRandom).toBe(false);
+    const connys = participantRows.filter((r: any) => r.playerName === 'Conny');
+    expect(connys).toHaveLength(2);
+    expect(connys.every((r: any) => r.isRandom === true)).toBe(true);
   });
 });
 

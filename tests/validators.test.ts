@@ -317,3 +317,74 @@ describe('gameUpdateSchema — body has no variant; invariants deferred to route
     expect(res.success).toBe(true);
   });
 });
+
+describe('gameCreateSchema — isRandom field', () => {
+  it('accepts participants with isRandom: true', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      participants: [
+        p('Alice', { isWinner: true }),
+        { ...p('Bob'), isRandom: true },
+      ],
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('defaults isRandom to false when omitted', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      participants: [
+        p('Alice', { isWinner: true }),
+        p('Bob'),
+      ],
+    });
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.participants.every((pp) => pp.isRandom === false)).toBe(true);
+    }
+  });
+
+  it('rejects two regular rows with the same name', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      participants: [
+        p('Alice', { isWinner: true }),
+        p('alice'),
+      ],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('accepts two random rows with the same name', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      participants: [
+        { ...p('Conny', { isWinner: true }), isRandom: true },
+        { ...p('Conny'), isRandom: true },
+      ],
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('accepts a regular row sharing a name with a random row', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      participants: [
+        p('Conny', { isWinner: true }),
+        { ...p('Conny'), isRandom: true },
+      ],
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('rejects empty playerName even when isRandom is true', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      participants: [
+        p('Alice', { isWinner: true }),
+        { ...p(''), isRandom: true },
+      ],
+    });
+    expect(res.success).toBe(false);
+  });
+});

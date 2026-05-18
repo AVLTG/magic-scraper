@@ -28,6 +28,7 @@ function mkParticipant(
   {
     isWinner = false,
     isScrewed = false,
+    isRandom = false,
     deckName = null as string | null,
   } = {}
 ) {
@@ -37,6 +38,7 @@ function mkParticipant(
     playerName,
     isWinner,
     isScrewed,
+    isRandom,
     deckName,
   };
 }
@@ -723,5 +725,207 @@ describe('computeScrewedByDeckPie (2026-05-16)', () => {
     const result = computeScrewedByDeckPie(games);
     expect(result[0]).toEqual({ deck: 'More', screwed: 2 });
     expect(result[1]).toEqual({ deck: 'Less', screwed: 1 });
+  });
+});
+
+describe('player-collapse: computeWinsByPlayerPie', () => {
+  it('treats a game with 2 winning randoms as +1 to Random', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Conny', { isWinner: true, isRandom: true }),
+        mkParticipant('Eve', { isWinner: true, isRandom: true }),
+      ]),
+    ];
+    const result = computeWinsByPlayerPie(games);
+    expect(result.find((r) => r.player === 'Random')?.wins).toBe(1);
+  });
+
+  it('counts a non-random win AND a random win in the same game separately', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isWinner: true }),
+        mkParticipant('Conny', { isWinner: true, isRandom: true }),
+      ]),
+    ];
+    const result = computeWinsByPlayerPie(games);
+    expect(result.find((r) => r.player === 'Alice')?.wins).toBe(1);
+    expect(result.find((r) => r.player === 'Random')?.wins).toBe(1);
+  });
+
+  it('a random winner does NOT show up under the real name', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Conny', { isWinner: true, isRandom: true }),
+      ]),
+    ];
+    const result = computeWinsByPlayerPie(games);
+    expect(result.find((r) => r.player === 'Conny')).toBeUndefined();
+  });
+});
+
+describe('player-collapse: computeScrewedByPlayerBar', () => {
+  it('treats a game with 2 screwed randoms as +1 to Random', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Conny', { isScrewed: true, isRandom: true, isWinner: true }),
+        mkParticipant('Eve', { isScrewed: true, isRandom: true }),
+      ]),
+    ];
+    const result = computeScrewedByPlayerBar(games);
+    expect(result.find((r) => r.player === 'Random')?.screwed).toBe(1);
+  });
+});
+
+describe('player-collapse: computeMostLikelyToPlay', () => {
+  it('treats a game with 2 random participants as +1 to Random', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isWinner: true }),
+        mkParticipant('Conny', { isRandom: true }),
+        mkParticipant('Eve', { isRandom: true }),
+      ]),
+    ];
+    const result = computeMostLikelyToPlay(games);
+    expect(result.find((r) => r.player === 'Random')?.participations).toBe(1);
+    expect(result.find((r) => r.player === 'Alice')?.participations).toBe(1);
+  });
+});
+
+describe('player-collapse: computeMostLikelyToPlayBump', () => {
+  it('collapses multiple randoms in one game to +1 in the cumulative Random row', () => {
+    // Single-week game with 3 randoms; cumulativeGames = 1.
+    // Random bucket should have participations = 1, NOT 3.
+    const games = [
+      mkGame('2026-04-06', [
+        mkParticipant('Alice', { isWinner: true }),
+        mkParticipant('Conny', { isRandom: true }),
+        mkParticipant('Eve', { isRandom: true }),
+        mkParticipant('Dave', { isRandom: true }),
+      ]),
+    ];
+    const result = computeMostLikelyToPlayBump(games);
+    expect(result).toHaveLength(1);
+    const week = result[0];
+    const randomEntry = week.ranks.find((r) => r.player === 'Random');
+    const aliceEntry = week.ranks.find((r) => r.player === 'Alice');
+    // Both should appear, both at rank 1 (tied because cumulativeGames=1 → both rate=1.0)
+    expect(randomEntry).toBeDefined();
+    expect(aliceEntry).toBeDefined();
+    expect(randomEntry?.rank).toBe(1);
+    expect(aliceEntry?.rank).toBe(1);
+  });
+
+  it('keeps a non-random Alice and a random Alice in separate buckets', () => {
+    const games = [
+      mkGame('2026-04-06', [
+        mkParticipant('Alice', { isWinner: true }),
+        mkParticipant('Alice', { isRandom: true }),
+      ]),
+    ];
+    const result = computeMostLikelyToPlayBump(games);
+    expect(result).toHaveLength(1);
+    const players = result[0].ranks.map((r) => r.player).sort();
+    expect(players).toEqual(['Alice', 'Random']);
+  });
+});
+
+describe('player-collapse: computePlayerWinRate', () => {
+  it('aggregates random plays + wins into a single Random bucket per game', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Conny', { isWinner: true, isRandom: true }),
+        mkParticipant('Eve', { isRandom: true }),
+      ]),
+      mkGame('2026-04-02', [
+        mkParticipant('Conny', { isRandom: true }),
+        mkParticipant('Eve', { isWinner: true, isRandom: true }),
+      ]),
+    ];
+    const result = computePlayerWinRate(games);
+    const random = result.find((r) => r.player === 'Random');
+    expect(random?.played).toBe(2);
+    expect(random?.wins).toBe(2);
+    expect(random?.rate).toBe(1);
+  });
+});
+
+describe('player-collapse: computeScrewedRate', () => {
+  it('aggregates random plays + screwed into a single Random bucket per game', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Conny', { isScrewed: true, isRandom: true, isWinner: true }),
+        mkParticipant('Eve', { isRandom: true }),
+      ]),
+      mkGame('2026-04-02', [
+        mkParticipant('Conny', { isRandom: true, isWinner: true }),
+        mkParticipant('Eve', { isScrewed: true, isRandom: true }),
+      ]),
+    ];
+    const result = computeScrewedRate(games);
+    const random = result.find((r) => r.player === 'Random');
+    expect(random?.played).toBe(2);
+    expect(random?.screwed).toBe(2);
+    expect(random?.rate).toBe(1);
+  });
+});
+
+describe('player-collapse: computePlayerRadar', () => {
+  it('emits a single Random row aggregating across random participants', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Conny', { isWinner: true, isScrewed: true, isRandom: true }),
+        mkParticipant('Eve', { isRandom: true }),
+      ]),
+    ];
+    const result = computePlayerRadar(games);
+    const random = result.find((r) => r.player === 'Random');
+    expect(random).toBeDefined();
+    expect(random?.played).toBe(1);
+    expect(random?.wins).toBe(1);
+    expect(random?.screwed).toBe(1);
+    expect(result.find((r) => r.player === 'Conny')).toBeUndefined();
+    expect(result.find((r) => r.player === 'Eve')).toBeUndefined();
+  });
+});
+
+describe('deck-skip: computeGamesByDeckPie', () => {
+  it('skips random participants when counting deck appearances', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isWinner: true, deckName: 'Atraxa' }),
+        mkParticipant('Conny', { isRandom: true, deckName: 'Selvala' }),
+      ]),
+    ];
+    const result = computeGamesByDeckPie(games);
+    expect(result.find((d) => d.deck === 'Atraxa')?.games).toBe(1);
+    expect(result.find((d) => d.deck === 'Selvala')).toBeUndefined();
+  });
+});
+
+describe('deck-skip: computeScrewedByDeckPie', () => {
+  it('skips random participants when counting deck screwed counts', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isWinner: true, isScrewed: true, deckName: 'Atraxa' }),
+        mkParticipant('Conny', { isScrewed: true, isRandom: true, deckName: 'Selvala' }),
+      ]),
+    ];
+    const result = computeScrewedByDeckPie(games);
+    expect(result.find((d) => d.deck === 'Atraxa')?.screwed).toBe(1);
+    expect(result.find((d) => d.deck === 'Selvala')).toBeUndefined();
+  });
+});
+
+describe('deck-skip: computeDeckWinRate', () => {
+  it('skips random participants when counting deck plays and wins', () => {
+    const games = [
+      mkGame('2026-04-01', [
+        mkParticipant('Alice', { isWinner: true, deckName: 'Atraxa' }),
+        mkParticipant('Conny', { isRandom: true, deckName: 'Selvala' }),
+      ]),
+    ];
+    const result = computeDeckWinRate(games);
+    expect(result.find((d) => d.deck === 'Atraxa')?.played).toBe(1);
+    expect(result.find((d) => d.deck === 'Selvala')).toBeUndefined();
   });
 });
