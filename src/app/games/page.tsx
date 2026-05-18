@@ -31,6 +31,7 @@ export interface FilterState {
   winner: string | null;
   playerCount: 2 | 3 | 4 | 5 | 6 | 7 | 8 | null;
   players: string[];
+  decks: string[];
 }
 
 /**
@@ -49,6 +50,15 @@ export function matchesAllFilters(game: Game, filters: FilterState): boolean {
   if (filters.players.length > 0) {
     const names = new Set(game.participants.map((p) => p.playerName));
     const anyMatch = filters.players.some((p) => names.has(p));
+    if (!anyMatch) return false;
+  }
+  if (filters.decks.length > 0) {
+    const usedDecks = new Set(
+      game.participants
+        .map((p) => p.deckName?.trim())
+        .filter((d): d is string => !!d && d !== '')
+    );
+    const anyMatch = filters.decks.some((d) => usedDecks.has(d));
     if (!anyMatch) return false;
   }
   return true;
@@ -75,6 +85,22 @@ export function derivePlayerOptions(games: Game[]): string[] {
   for (const g of games) {
     for (const p of g.participants) {
       set.add(p.playerName);
+    }
+  }
+  return Array.from(set).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+
+/**
+ * Distinct deck names from currently-loaded games, alphabetized case-insensitively.
+ * Skips null/empty/whitespace-only deck names; trims before dedup so ' Selvala ' and
+ * 'Selvala' collapse to one entry.
+ */
+export function deriveDeckOptions(games: Game[]): string[] {
+  const set = new Set<string>();
+  for (const g of games) {
+    for (const p of g.participants) {
+      const trimmed = p.deckName?.trim();
+      if (trimmed) set.add(trimmed);
     }
   }
   return Array.from(set).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -109,6 +135,7 @@ export default function GamesPage() {
   const [winnerFilter, setWinnerFilter] = useState<string | null>(null);
   const [countFilter, setCountFilter] = useState<2 | 3 | 4 | 5 | 6 | 7 | 8 | null>(null);
   const [playerFilters, setPlayerFilters] = useState<string[]>([]);
+  const [deckFilters, setDeckFilters] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,28 +185,45 @@ export default function GamesPage() {
   // Phase 6.1 D-19, D-20: dynamic option sources from currently-loaded games
   const winnerOptions = useMemo(() => deriveWinnerOptions(games), [games]);
   const playerOptions = useMemo(() => derivePlayerOptions(games), [games]);
+  const deckOptions = useMemo(() => deriveDeckOptions(games), [games]);
 
   // Phase 6.1 D-22: derived filtered list — no refetch, no loading state
   const filteredGames = useMemo(
     () =>
       games.filter((g) =>
-        matchesAllFilters(g, { winner: winnerFilter, playerCount: countFilter, players: playerFilters })
+        matchesAllFilters(g, {
+          winner: winnerFilter,
+          playerCount: countFilter,
+          players: playerFilters,
+          decks: deckFilters,
+        })
       ),
-    [games, winnerFilter, countFilter, playerFilters]
+    [games, winnerFilter, countFilter, playerFilters, deckFilters]
   );
 
   // Phase 6.1 D-23: any filter active?
-  const anyFilterActive = winnerFilter !== null || countFilter !== null || playerFilters.length > 0;
+  const anyFilterActive =
+    winnerFilter !== null ||
+    countFilter !== null ||
+    playerFilters.length > 0 ||
+    deckFilters.length > 0;
 
   const clearFilters = () => {
     setWinnerFilter(null);
     setCountFilter(null);
     setPlayerFilters([]);
+    setDeckFilters([]);
   };
 
   const togglePlayerFilter = (name: string) => {
     setPlayerFilters((prev) =>
       prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name]
+    );
+  };
+
+  const toggleDeckFilter = (name: string) => {
+    setDeckFilters((prev) =>
+      prev.includes(name) ? prev.filter((d) => d !== name) : [...prev, name]
     );
   };
 
@@ -255,6 +299,35 @@ export default function GamesPage() {
                       type="checkbox"
                       checked={playerFilters.includes(name)}
                       onChange={() => togglePlayerFilter(name)}
+                    />
+                    <span>{name}</span>
+                  </label>
+                ))}
+              </div>
+            </details>
+          </div>
+
+          <div className="flex-1 min-w-[12rem]">
+            <label className="block text-xs text-muted mb-1">
+              Decks {deckFilters.length > 0 && `(${deckFilters.length} selected)`}
+            </label>
+            <details className="relative">
+              <summary className="px-3 py-2 rounded-md border border-border bg-surface text-foreground text-sm cursor-pointer list-none">
+                {deckFilters.length === 0 ? 'Any decks' : deckFilters.join(', ')}
+              </summary>
+              <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-surface shadow-lg p-2">
+                {deckOptions.length === 0 && (
+                  <p className="text-xs text-muted italic px-1 py-1">No decks yet</p>
+                )}
+                {deckOptions.map((name) => (
+                  <label
+                    key={name}
+                    className="flex items-center gap-2 px-1 py-1 text-sm text-foreground hover:bg-surface-hover rounded cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={deckFilters.includes(name)}
+                      onChange={() => toggleDeckFilter(name)}
                     />
                     <span>{name}</span>
                   </label>

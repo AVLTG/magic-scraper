@@ -2,6 +2,7 @@ import {
   matchesAllFilters,
   deriveWinnerOptions,
   derivePlayerOptions,
+  deriveDeckOptions,
   type FilterState,
   type Game,
 } from '../src/app/games/page';
@@ -34,7 +35,7 @@ function mkGame(id: string, participants: ReturnType<typeof mkParticipant>[]): G
   };
 }
 
-const EMPTY_FILTERS: FilterState = { winner: null, playerCount: null, players: [] };
+const EMPTY_FILTERS: FilterState = { winner: null, playerCount: null, players: [], decks: [] };
 
 describe('matchesAllFilters (D-17)', () => {
   const gameAB = mkGame('g1', [mkParticipant('Alice', true), mkParticipant('Bob')]);
@@ -87,8 +88,8 @@ describe('matchesAllFilters (D-17)', () => {
         mkParticipant('E'),
         mkParticipant('F'),
       ]);
-      expect(matchesAllFilters(game6, { winner: null, playerCount: 6, players: [] })).toBe(true);
-      expect(matchesAllFilters(game6, { winner: null, playerCount: 4, players: [] })).toBe(false);
+      expect(matchesAllFilters(game6, { winner: null, playerCount: 6, players: [], decks: [] })).toBe(true);
+      expect(matchesAllFilters(game6, { winner: null, playerCount: 4, players: [], decks: [] })).toBe(false);
     });
   });
 
@@ -110,16 +111,89 @@ describe('matchesAllFilters (D-17)', () => {
   describe('AND-across-types combine (D-17)', () => {
     it('requires all active filter types to pass', () => {
       expect(
-        matchesAllFilters(gameABCD, { winner: 'Carol', playerCount: 4, players: ['Bob', 'Zara'] })
+        matchesAllFilters(gameABCD, { winner: 'Carol', playerCount: 4, players: ['Bob', 'Zara'], decks: [] })
       ).toBe(true);
     });
     it('rejects when one filter type fails', () => {
       expect(
-        matchesAllFilters(gameABC, { winner: 'Alice', playerCount: 4, players: ['Alice'] })
+        matchesAllFilters(gameABC, { winner: 'Alice', playerCount: 4, players: ['Alice'], decks: [] })
       ).toBe(false); // count 3 != 4
       expect(
-        matchesAllFilters(gameABCD, { winner: 'Alice', playerCount: 4, players: ['Alice'] })
+        matchesAllFilters(gameABCD, { winner: 'Alice', playerCount: 4, players: ['Alice'], decks: [] })
       ).toBe(false); // winner is Carol, not Alice
+    });
+  });
+
+  describe('decks filter', () => {
+    const selvala = mkGame('g-s', [
+      mkParticipant('Alice', true, false, 'Selvala'),
+      mkParticipant('Bob', false, false, 'Atraxa'),
+    ]);
+    const breya = mkGame('g-b', [
+      mkParticipant('Carol', true, false, 'Breya'),
+      mkParticipant('Dave', false, false, 'Atraxa'),
+    ]);
+    const allBlank = mkGame('g-x', [
+      mkParticipant('Eve', true, false, null),
+      mkParticipant('Frank', false, false, '   '),
+    ]);
+
+    it('passthrough when decks array is empty', () => {
+      expect(matchesAllFilters(selvala, EMPTY_FILTERS)).toBe(true);
+      expect(matchesAllFilters(allBlank, EMPTY_FILTERS)).toBe(true);
+    });
+
+    it('matches when any participant played the selected deck', () => {
+      expect(matchesAllFilters(selvala, { ...EMPTY_FILTERS, decks: ['Selvala'] })).toBe(true);
+      expect(matchesAllFilters(selvala, { ...EMPTY_FILTERS, decks: ['Atraxa'] })).toBe(true);
+    });
+
+    it('multi-select is OR within: any of the selected decks suffices', () => {
+      expect(
+        matchesAllFilters(selvala, { ...EMPTY_FILTERS, decks: ['Breya', 'Atraxa'] })
+      ).toBe(true);
+      expect(
+        matchesAllFilters(breya, { ...EMPTY_FILTERS, decks: ['Selvala', 'Atraxa'] })
+      ).toBe(true);
+    });
+
+    it('rejects when no participant played any selected deck', () => {
+      expect(
+        matchesAllFilters(selvala, { ...EMPTY_FILTERS, decks: ['Breya'] })
+      ).toBe(false);
+      expect(
+        matchesAllFilters(breya, { ...EMPTY_FILTERS, decks: ['Selvala'] })
+      ).toBe(false);
+    });
+
+    it('skips participants with null/empty/whitespace deck names', () => {
+      expect(
+        matchesAllFilters(allBlank, { ...EMPTY_FILTERS, decks: ['Selvala'] })
+      ).toBe(false);
+    });
+
+    it('ANDs across filter types: deck + player', () => {
+      expect(
+        matchesAllFilters(selvala, {
+          ...EMPTY_FILTERS,
+          players: ['Alice'],
+          decks: ['Selvala'],
+        })
+      ).toBe(true);
+      expect(
+        matchesAllFilters(selvala, {
+          ...EMPTY_FILTERS,
+          players: ['Alice'],
+          decks: ['Breya'],
+        })
+      ).toBe(false);
+      expect(
+        matchesAllFilters(selvala, {
+          ...EMPTY_FILTERS,
+          players: ['Carol'],
+          decks: ['Selvala'],
+        })
+      ).toBe(false);
     });
   });
 });
@@ -166,5 +240,65 @@ describe('derivePlayerOptions (D-20)', () => {
   it('sorts alphabetically (case-insensitive)', () => {
     const g1 = mkGame('g1', [mkParticipant('Zara'), mkParticipant('alice'), mkParticipant('Bob', true)]);
     expect(derivePlayerOptions([g1])).toEqual(['alice', 'Bob', 'Zara']);
+  });
+});
+
+describe('deriveDeckOptions', () => {
+  it('returns empty array for empty input', () => {
+    expect(deriveDeckOptions([])).toEqual([]);
+  });
+
+  it('returns distinct deck names, alphabetized case-insensitively', () => {
+    const games = [
+      mkGame('g1', [
+        mkParticipant('Alice', true, false, 'Selvala'),
+        mkParticipant('Bob', false, false, 'Atraxa'),
+      ]),
+      mkGame('g2', [
+        mkParticipant('Carol', true, false, 'breya'),
+        mkParticipant('Dave', false, false, 'Atraxa'),
+      ]),
+    ];
+    expect(deriveDeckOptions(games)).toEqual(['Atraxa', 'breya', 'Selvala']);
+  });
+
+  it('skips null deck names', () => {
+    const games = [
+      mkGame('g1', [
+        mkParticipant('Alice', true, false, null),
+        mkParticipant('Bob', false, false, 'Atraxa'),
+      ]),
+    ];
+    expect(deriveDeckOptions(games)).toEqual(['Atraxa']);
+  });
+
+  it('skips empty-string deck names', () => {
+    const games = [
+      mkGame('g1', [
+        mkParticipant('Alice', true, false, ''),
+        mkParticipant('Bob', false, false, 'Atraxa'),
+      ]),
+    ];
+    expect(deriveDeckOptions(games)).toEqual(['Atraxa']);
+  });
+
+  it('skips whitespace-only deck names', () => {
+    const games = [
+      mkGame('g1', [
+        mkParticipant('Alice', true, false, '   '),
+        mkParticipant('Bob', false, false, 'Atraxa'),
+      ]),
+    ];
+    expect(deriveDeckOptions(games)).toEqual(['Atraxa']);
+  });
+
+  it('trims surrounding whitespace before dedup', () => {
+    const games = [
+      mkGame('g1', [
+        mkParticipant('Alice', true, false, 'Selvala'),
+        mkParticipant('Bob', false, false, ' Selvala '),
+      ]),
+    ];
+    expect(deriveDeckOptions(games)).toEqual(['Selvala']);
   });
 });
