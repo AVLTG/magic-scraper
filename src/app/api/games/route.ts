@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { gameSchema } from '@/lib/validators';
+import { gameCreateSchema } from '@/lib/validators';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
 
 export async function POST(request: Request) {
@@ -17,10 +17,11 @@ export async function POST(request: Request) {
   }
   try {
     const body = await request.json();
-    const { date, wonByCombo, notes, participants } = gameSchema.parse(body);
+    const { date, wonByCombo, notes, variant, participants } =
+      gameCreateSchema.parse(body);
     const game = await prisma.$transaction(async (tx) => {
       const created = await tx.game.create({
-        data: { date, wonByCombo, notes },
+        data: { date, wonByCombo, notes, variant },
       });
       await tx.gameParticipant.createMany({
         data: participants.map((p) => ({
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
           isWinner: p.isWinner,
           isScrewed: p.isScrewed,
           deckName: p.deckName,
+          role: p.role,
         })),
       });
       return created;

@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect, FormEvent } from 'react';
 import { Combobox } from '@/app/components/combobox';
+import type { GameVariant, ParticipantRole } from '@/lib/validators';
+
+export type { GameVariant, ParticipantRole };
 
 export interface ParticipantRow {
   playerName: string;
@@ -9,23 +12,31 @@ export interface ParticipantRow {
   isScrewed: boolean;
 }
 
+export type WinningTeam = 'ROYALTY' | 'ASSASSINS';
+
 export interface GameFormState {
-  date: string; // yyyy-mm-dd
+  date: string;
   notes: string;
   wonByCombo: boolean;
-  rows: ParticipantRow[]; // length matches playerCount (2..8)
-  winnerIndex: number; // 0..rows.length-1 or -1
+  rows: ParticipantRow[];
+  winnerIndex: number;                    // STANDARD only
+  winnerIndices: number[];                // STAR only (0-2 entries)
+  roles: (ParticipantRole | null)[];      // KING only — index-aligned with rows
+  winningTeam: WinningTeam | null;        // KING only
+  variant: GameVariant;
 }
 
 export interface GameFormPayload {
-  date: string; // ISO string
+  date: string;
   wonByCombo: boolean;
   notes?: string;
+  variant?: GameVariant;
   participants: {
     playerName: string;
     isWinner: boolean;
     isScrewed: boolean;
     deckName?: string;
+    role?: ParticipantRole;
   }[];
 }
 
@@ -71,13 +82,6 @@ export function validateGameForm(state: GameFormState): ValidationResult {
     errors.form = `All ${state.rows.length} participant names are required`;
   }
 
-  if (
-    !errors.form &&
-    (state.winnerIndex < 0 || state.winnerIndex >= state.rows.length)
-  ) {
-    errors.form = 'Exactly one winner required';
-  }
-
   const rowErrors: Record<number, string> = {};
   state.rows.forEach((r, i) => {
     if (r.playerName.length > 100) rowErrors[i] = 'Player name too long (max 100)';
@@ -85,16 +89,57 @@ export function validateGameForm(state: GameFormState): ValidationResult {
   });
   if (Object.keys(rowErrors).length > 0) errors.rows = rowErrors;
 
+  if (!errors.form) {
+    if (state.variant === 'STANDARD') {
+      if (state.winnerIndex < 0 || state.winnerIndex >= state.rows.length) {
+        errors.form = 'Exactly one winner required';
+      }
+    } else if (state.variant === 'STAR') {
+      if (state.winnerIndices.length < 1 || state.winnerIndices.length > 2) {
+        errors.form = 'Star Commander games need 1 or 2 winners';
+      }
+    } else {
+      const kingCount = state.roles.filter((r) => r === 'KING').length;
+      const unassigned = state.roles.some((r) => r == null);
+      if (unassigned) {
+        errors.form = 'Every player needs a role (King, Squire, or Assassin)';
+      } else if (kingCount !== 1) {
+        errors.form = 'King Commander games need exactly one King';
+      } else if (state.winningTeam == null) {
+        errors.form = 'Pick the winning team (Royalty or Assassins)';
+      }
+    }
+  }
+
   if (errors.date || errors.form || errors.rows) {
     return { ok: false, errors };
   }
 
-  const participants = state.rows.map((r, i) => ({
-    playerName: r.playerName.trim(),
-    isWinner: i === state.winnerIndex,
-    isScrewed: r.isScrewed,
-    deckName: r.deckName.trim() === '' ? undefined : r.deckName.trim(),
-  }));
+  const participants = state.rows.map((r, i) => {
+    let isWinner = false;
+    let role: ParticipantRole | undefined;
+
+    if (state.variant === 'STANDARD') {
+      isWinner = i === state.winnerIndex;
+    } else if (state.variant === 'STAR') {
+      isWinner = state.winnerIndices.includes(i);
+    } else {
+      role = state.roles[i] as ParticipantRole;
+      if (state.winningTeam === 'ROYALTY') {
+        isWinner = role === 'KING' || role === 'SQUIRE';
+      } else {
+        isWinner = role === 'ASSASSIN';
+      }
+    }
+
+    return {
+      playerName: r.playerName.trim(),
+      isWinner,
+      isScrewed: r.isScrewed,
+      deckName: r.deckName.trim() === '' ? undefined : r.deckName.trim(),
+      role,
+    };
+  });
 
   return {
     ok: true,
@@ -102,6 +147,7 @@ export function validateGameForm(state: GameFormState): ValidationResult {
       date: new Date(state.date).toISOString(),
       wonByCombo: state.wonByCombo,
       notes: state.notes.trim() === '' ? undefined : state.notes.trim(),
+      variant: state.variant,
       participants,
     },
   };
@@ -116,8 +162,16 @@ export function buildInitialState(game: {
   date: string | Date;
   wonByCombo: boolean;
   notes: string | null;
-  participants: { playerName: string; isWinner: boolean; isScrewed: boolean; deckName: string | null }[];
+  variant?: GameVariant;
+  participants: {
+    playerName: string;
+    isWinner: boolean;
+    isScrewed: boolean;
+    deckName: string | null;
+    role?: ParticipantRole | null;
+  }[];
 }): GameFormState {
+  const variant: GameVariant = game.variant ?? 'STANDARD';
   const rows: ParticipantRow[] = game.participants.map((p) => ({
     playerName: p.playerName,
     deckName: p.deckName ?? '',
@@ -125,27 +179,58 @@ export function buildInitialState(game: {
     isScrewed: p.isScrewed,
   }));
   const winnerIndex = game.participants.findIndex((p) => p.isWinner);
+  const winnerIndices = game.participants
+    .map((p, i) => (p.isWinner ? i : -1))
+    .filter((i) => i >= 0);
+  const roles: (ParticipantRole | null)[] = game.participants.map(
+    (p) => (p.role as ParticipantRole | null | undefined) ?? null
+  );
+
+  let winningTeam: WinningTeam | null = null;
+  if (variant === 'KING') {
+    const royaltyWon = game.participants.some(
+      (p) => p.isWinner && (p.role === 'KING' || p.role === 'SQUIRE')
+    );
+    const assassinsWon = game.participants.some(
+      (p) => p.isWinner && p.role === 'ASSASSIN'
+    );
+    if (royaltyWon) winningTeam = 'ROYALTY';
+    else if (assassinsWon) winningTeam = 'ASSASSINS';
+  }
+
   const dateStr =
     typeof game.date === 'string'
       ? new Date(game.date).toISOString().slice(0, 10)
       : game.date.toISOString().slice(0, 10);
+
   return {
     date: dateStr,
     notes: game.notes ?? '',
     wonByCombo: game.wonByCombo,
     rows,
     winnerIndex,
+    winnerIndices,
+    roles,
+    winningTeam,
+    variant,
   };
 }
 
 export interface GameFormProps {
   playerCount: number;
+  variant?: GameVariant;
   initial?: GameFormState;
   submitLabel?: string;
   onSubmit: (payload: GameFormPayload) => Promise<void> | void;
 }
 
-export function GameForm({ playerCount, initial, submitLabel = 'Save game', onSubmit }: GameFormProps) {
+export function GameForm({
+  playerCount,
+  variant = 'STANDARD',
+  initial,
+  submitLabel = 'Save game',
+  onSubmit,
+}: GameFormProps) {
   const [state, setState] = useState<GameFormState>(
     initial ?? {
       // en-CA locale formats dates as YYYY-MM-DD and respects the viewer's
@@ -157,6 +242,10 @@ export function GameForm({ playerCount, initial, submitLabel = 'Save game', onSu
       wonByCombo: false,
       rows: Array.from({ length: playerCount }, emptyRow),
       winnerIndex: -1,
+      winnerIndices: [],
+      roles: Array.from({ length: playerCount }, () => null) as (ParticipantRole | null)[],
+      winningTeam: null,
+      variant,
     }
   );
   const [playerItems, setPlayerItems] = useState<string[]>([]);
@@ -262,6 +351,40 @@ export function GameForm({ playerCount, initial, submitLabel = 'Save game', onSu
         />
       </div>
 
+      {state.variant === 'KING' && (
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">Who won?</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setState((s) => ({ ...s, winningTeam: 'ROYALTY' }))
+              }
+              className={`flex-1 px-4 py-2 rounded-md border font-medium transition-colors ${
+                state.winningTeam === 'ROYALTY'
+                  ? 'bg-accent text-background border-accent'
+                  : 'bg-surface text-foreground border-border hover:bg-accent/10'
+              }`}
+            >
+              Royalty
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setState((s) => ({ ...s, winningTeam: 'ASSASSINS' }))
+              }
+              className={`flex-1 px-4 py-2 rounded-md border font-medium transition-colors ${
+                state.winningTeam === 'ASSASSINS'
+                  ? 'bg-accent text-background border-accent'
+                  : 'bg-surface text-foreground border-border hover:bg-accent/10'
+              }`}
+            >
+              Assassins
+            </button>
+          </div>
+        </div>
+      )}
+
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-foreground">Participants</legend>
         {state.rows.map((r, i) => (
@@ -282,15 +405,70 @@ export function GameForm({ playerCount, initial, submitLabel = 'Save game', onSu
               placeholder="Deck (optional)"
               addLabel="deck"
             />
-            <label className="flex items-center gap-1 text-xs text-muted">
-              <input
-                type="radio"
-                name="winner"
-                checked={state.winnerIndex === i}
-                onChange={() => setState((s) => ({ ...s, winnerIndex: i }))}
-              />
-              Winner
-            </label>
+            {state.variant === 'STANDARD' && (
+              <label className="flex items-center gap-1 text-xs text-muted">
+                <input
+                  type="radio"
+                  name="winner"
+                  checked={state.winnerIndex === i}
+                  onChange={() => setState((s) => ({ ...s, winnerIndex: i }))}
+                />
+                Winner
+              </label>
+            )}
+            {state.variant === 'STAR' && (
+              <label className="flex items-center gap-1 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={state.winnerIndices.includes(i)}
+                  disabled={
+                    !state.winnerIndices.includes(i) && state.winnerIndices.length >= 2
+                  }
+                  onChange={(e) =>
+                    setState((s) => {
+                      const isChecked = e.target.checked;
+                      const next = isChecked
+                        ? [...s.winnerIndices, i]
+                        : s.winnerIndices.filter((idx) => idx !== i);
+                      return { ...s, winnerIndices: next };
+                    })
+                  }
+                />
+                Winner
+              </label>
+            )}
+            {state.variant === 'KING' && (
+              <div
+                role="radiogroup"
+                aria-label={`Role for player ${i + 1}`}
+                className="flex items-center gap-1 text-xs text-muted"
+              >
+                {(['KING', 'SQUIRE', 'ASSASSIN'] as const).map((role) => (
+                  <label key={role} className="flex items-center gap-0.5">
+                    <input
+                      type="radio"
+                      name={`role-${i}`}
+                      aria-label={role.charAt(0) + role.slice(1).toLowerCase()}
+                      checked={state.roles[i] === role}
+                      onChange={() =>
+                        setState((s) => ({
+                          ...s,
+                          roles: s.roles.map((existing, idx) =>
+                            idx === i
+                              ? role
+                              : // Enforce single-KING: if this row becomes KING, clear any other KING.
+                              role === 'KING' && existing === 'KING'
+                              ? null
+                              : existing
+                          ),
+                        }))
+                      }
+                    />
+                    {role[0]}
+                  </label>
+                ))}
+              </div>
+            )}
             <label className="flex items-center gap-1 text-xs text-muted">
               <input
                 type="checkbox"

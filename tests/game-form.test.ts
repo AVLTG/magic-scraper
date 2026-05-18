@@ -2,6 +2,11 @@ import {
   excludeItemsForRow,
   validateGameForm,
 } from '../src/app/games/game-form';
+import type {
+  GameFormState,
+  GameVariant,
+  ParticipantRole,
+} from '../src/app/games/game-form';
 
 type ParticipantRow = {
   playerName: string;
@@ -17,7 +22,15 @@ function row(playerName: string, extra: Partial<ParticipantRow> = {}): Participa
 function baseState(
   rows: ParticipantRow[],
   winnerIndex: number,
-  overrides: Partial<{ date: string; notes: string; wonByCombo: boolean }> = {}
+  overrides: Partial<{
+    date: string;
+    notes: string;
+    wonByCombo: boolean;
+    winnerIndices: number[];
+    roles: (ParticipantRole | null)[];
+    winningTeam: 'ROYALTY' | 'ASSASSINS' | null;
+    variant: GameVariant;
+  }> = {}
 ) {
   return {
     date: '2026-04-10',
@@ -25,6 +38,10 @@ function baseState(
     wonByCombo: false,
     rows,
     winnerIndex,
+    winnerIndices: [],
+    roles: rows.map(() => null) as (ParticipantRole | null)[],
+    winningTeam: null as 'ROYALTY' | 'ASSASSINS' | null,
+    variant: 'STANDARD' as GameVariant,
     ...overrides,
   };
 }
@@ -200,5 +217,178 @@ describe('excludeItemsForRow (D-10, D-11)', () => {
       Array.from({ length: 8 }, (_, i) => row(`P${i}`))
     );
     expect(excludeItemsForRow(7, state)).toEqual(['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6']);
+  });
+});
+
+function baseStateV(
+  variant: GameVariant,
+  rows: ParticipantRow[],
+  extras: Partial<GameFormState> = {}
+): GameFormState {
+  return {
+    date: '2026-04-10',
+    notes: '',
+    wonByCombo: false,
+    rows,
+    winnerIndex: -1,
+    winnerIndices: [],
+    roles: rows.map(() => null) as (ParticipantRole | null)[],
+    winningTeam: null,
+    variant,
+    ...extras,
+  };
+}
+
+describe('validateGameForm — STAR variant', () => {
+  it('accepts a 5-player STAR with one winner', () => {
+    const state = baseStateV('STAR', [
+      row('A'), row('B'), row('C'), row('D'), row('E'),
+    ], { winnerIndices: [0] });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.variant).toBe('STAR');
+      expect(result.payload.participants.filter((p) => p.isWinner)).toHaveLength(1);
+      expect(result.payload.participants.every((p) => p.role === undefined)).toBe(true);
+    }
+  });
+
+  it('accepts a 5-player STAR with two winners', () => {
+    const state = baseStateV('STAR', [
+      row('A'), row('B'), row('C'), row('D'), row('E'),
+    ], { winnerIndices: [1, 3] });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.participants.filter((p) => p.isWinner)).toHaveLength(2);
+    }
+  });
+
+  it('rejects STAR with zero winners', () => {
+    const state = baseStateV('STAR', [
+      row('A'), row('B'), row('C'), row('D'), row('E'),
+    ], { winnerIndices: [] });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects STAR with three winners', () => {
+    const state = baseStateV('STAR', [
+      row('A'), row('B'), row('C'), row('D'), row('E'),
+    ], { winnerIndices: [0, 1, 2] });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('validateGameForm — KING variant', () => {
+  function kingRoles(picks: (ParticipantRole | null)[]) {
+    return picks;
+  }
+
+  it('derives Royalty winners when winningTeam is ROYALTY', () => {
+    const state = baseStateV('KING', [
+      row('K'), row('S1'), row('S2'), row('A1'), row('A2'), row('A3'),
+    ], {
+      roles: kingRoles(['KING', 'SQUIRE', 'SQUIRE', 'ASSASSIN', 'ASSASSIN', 'ASSASSIN']),
+      winningTeam: 'ROYALTY',
+    });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.variant).toBe('KING');
+      const winners = result.payload.participants.filter((p) => p.isWinner).map((p) => p.playerName);
+      expect(winners.sort()).toEqual(['K', 'S1', 'S2']);
+      expect(result.payload.participants.find((p) => p.playerName === 'K')!.role).toBe('KING');
+    }
+  });
+
+  it('derives Assassin winners when winningTeam is ASSASSINS', () => {
+    const state = baseStateV('KING', [
+      row('K'), row('S1'), row('S2'), row('A1'), row('A2'), row('A3'),
+    ], {
+      roles: kingRoles(['KING', 'SQUIRE', 'SQUIRE', 'ASSASSIN', 'ASSASSIN', 'ASSASSIN']),
+      winningTeam: 'ASSASSINS',
+    });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const winners = result.payload.participants.filter((p) => p.isWinner).map((p) => p.playerName);
+      expect(winners.sort()).toEqual(['A1', 'A2', 'A3']);
+    }
+  });
+
+  it('rejects KING with no team selected', () => {
+    const state = baseStateV('KING', [
+      row('K'), row('S1'), row('S2'), row('A1'), row('A2'), row('A3'),
+    ], {
+      roles: kingRoles(['KING', 'SQUIRE', 'SQUIRE', 'ASSASSIN', 'ASSASSIN', 'ASSASSIN']),
+      winningTeam: null,
+    });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects KING with no KING role assigned', () => {
+    const state = baseStateV('KING', [
+      row('A'), row('B'), row('C'), row('D'), row('E'), row('F'),
+    ], {
+      roles: kingRoles(['SQUIRE', 'SQUIRE', 'SQUIRE', 'ASSASSIN', 'ASSASSIN', 'ASSASSIN']),
+      winningTeam: 'ROYALTY',
+    });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects KING with an unassigned role', () => {
+    const state = baseStateV('KING', [
+      row('K'), row('S1'), row('S2'), row('A1'), row('A2'), row('X'),
+    ], {
+      roles: kingRoles(['KING', 'SQUIRE', 'SQUIRE', 'ASSASSIN', 'ASSASSIN', null]),
+      winningTeam: 'ROYALTY',
+    });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('validateGameForm — STANDARD passthrough', () => {
+  it('still works with the new state shape (defaults pass through)', () => {
+    const state = baseStateV('STANDARD', [
+      row('A', { isWinner: true }), row('B'),
+    ], { winnerIndex: 0 });
+    const result = validateGameForm(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.variant).toBe('STANDARD');
+      expect(result.payload.participants[0].isWinner).toBe(true);
+      expect(result.payload.participants.every((p) => p.role === undefined)).toBe(true);
+    }
+  });
+});
+
+import { variantQuestionForCount } from '../src/app/games/new/page';
+
+describe('variantQuestionForCount — gate helper', () => {
+  it('returns null for 2-4 player games (no variant question)', () => {
+    expect(variantQuestionForCount(2)).toBeNull();
+    expect(variantQuestionForCount(3)).toBeNull();
+    expect(variantQuestionForCount(4)).toBeNull();
+  });
+
+  it('returns STAR question for 5-player games', () => {
+    expect(variantQuestionForCount(5)).toEqual({
+      variantOnYes: 'STAR',
+      label: 'Was this a Star Commander game?',
+    });
+  });
+
+  it('returns KING question for 6/7/8-player games', () => {
+    for (const n of [6, 7, 8]) {
+      expect(variantQuestionForCount(n)).toEqual({
+        variantOnYes: 'KING',
+        label: 'Was this a King Commander game?',
+      });
+    }
   });
 });

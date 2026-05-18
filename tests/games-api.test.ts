@@ -334,6 +334,46 @@ describe('POST /api/games', () => {
     await POST(makeRequest(validGameBody));
     expect(mockCheckRateLimit).toHaveBeenCalledWith('test-ip', 30, 60000);
   });
+
+  it('persists variant and role for a KING-variant game', async () => {
+    mockCheckRateLimit.mockReturnValue({ allowed: true });
+    const gameCreateSpy = jest.fn().mockResolvedValue({ id: 'g-king', variant: 'KING' });
+    const participantCreateManySpy = jest.fn().mockResolvedValue({ count: 6 });
+    mockTransaction.mockImplementation(async (cb: any) =>
+      cb({
+        game: { create: gameCreateSpy },
+        gameParticipant: { createMany: participantCreateManySpy },
+      })
+    );
+
+    const body = {
+      date: new Date('2026-05-01').toISOString(),
+      variant: 'KING',
+      participants: [
+        { playerName: 'K', isWinner: true, isScrewed: false, role: 'KING' },
+        { playerName: 'S1', isWinner: true, isScrewed: false, role: 'SQUIRE' },
+        { playerName: 'S2', isWinner: true, isScrewed: false, role: 'SQUIRE' },
+        { playerName: 'A1', isWinner: false, isScrewed: false, role: 'ASSASSIN' },
+        { playerName: 'A2', isWinner: false, isScrewed: false, role: 'ASSASSIN' },
+        { playerName: 'A3', isWinner: false, isScrewed: false, role: 'ASSASSIN' },
+      ],
+    };
+
+    const res: any = await POST(makeRequest(body));
+    expect(res.status).toBe(201);
+
+    // Assert variant was passed to game.create
+    expect(gameCreateSpy).toHaveBeenCalledTimes(1);
+    expect(gameCreateSpy.mock.calls[0][0].data).toMatchObject({ variant: 'KING' });
+
+    // Assert roles were passed to participant.createMany
+    expect(participantCreateManySpy).toHaveBeenCalledTimes(1);
+    const participantRows = participantCreateManySpy.mock.calls[0][0].data;
+    expect(participantRows).toHaveLength(6);
+    expect(participantRows.find((r: any) => r.playerName === 'K').role).toBe('KING');
+    expect(participantRows.find((r: any) => r.playerName === 'S1').role).toBe('SQUIRE');
+    expect(participantRows.find((r: any) => r.playerName === 'A1').role).toBe('ASSASSIN');
+  });
 });
 
 describe('GET /api/games', () => {
@@ -458,6 +498,7 @@ describe('PATCH /api/games/[id]', () => {
   });
 
   it('full-replace: deletes existing participants, updates game, creates new participants', async () => {
+    mockGameFindUnique.mockResolvedValue({ variant: 'STANDARD' });
     mockParticipantDeleteMany.mockResolvedValue({ count: 2 });
     mockGameUpdate.mockResolvedValue({
       id: 'g1',
@@ -499,16 +540,44 @@ describe('PATCH /api/games/[id]', () => {
   });
 
   it('returns 404 when update targets missing id (P2025)', async () => {
-    mockTransaction.mockRejectedValue(
-      Object.assign(new Error('Not found'), { code: 'P2025' })
-    );
+    mockCheckRateLimit.mockReturnValue({ allowed: true });
+    mockGameFindUnique.mockResolvedValue({ variant: 'STANDARD' });
+    mockTransaction.mockRejectedValue({ code: 'P2025' });
+
     const body = {
-      date: '2026-04-10T00:00:00.000Z',
-      wonByCombo: false,
-      participants: [{ playerName: 'X', isWinner: true, isScrewed: false }],
+      date: new Date('2026-05-01').toISOString(),
+      participants: [
+        { playerName: 'A', isWinner: true, isScrewed: false },
+        { playerName: 'B', isWinner: false, isScrewed: false },
+      ],
     };
-    const res: any = await patchGame(makeRequest(body), makeParams('missing'));
+
+    const res: any = await patchGame(
+      makeRequest(body),
+      { params: Promise.resolve({ id: 'missing-id' }) }
+    );
     expect(res.status).toBe(404);
+    expect(mockTransaction).toHaveBeenCalled();
+  });
+
+  it('returns 404 when pre-flight findUnique returns no existing game', async () => {
+    mockCheckRateLimit.mockReturnValue({ allowed: true });
+    mockGameFindUnique.mockResolvedValue(null);
+
+    const body = {
+      date: new Date('2026-05-01').toISOString(),
+      participants: [
+        { playerName: 'A', isWinner: true, isScrewed: false },
+        { playerName: 'B', isWinner: false, isScrewed: false },
+      ],
+    };
+
+    const res: any = await patchGame(
+      makeRequest(body),
+      { params: Promise.resolve({ id: 'missing-id' }) }
+    );
+    expect(res.status).toBe(404);
+    expect(mockTransaction).not.toHaveBeenCalled();
   });
 
   it('returns 429 when rate limited', async () => {
@@ -518,6 +587,54 @@ describe('PATCH /api/games/[id]', () => {
     });
     const res: any = await patchGame(makeRequest({}), makeParams('g1'));
     expect(res.status).toBe(429);
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects PATCH that violates the stored KING variant invariants', async () => {
+    mockCheckRateLimit.mockReturnValue({ allowed: true });
+    mockGameFindUnique.mockResolvedValue({ id: 'g-1', variant: 'KING' });
+
+    const body = {
+      date: new Date('2026-05-01').toISOString(),
+      participants: [
+        { playerName: 'A', isWinner: true, isScrewed: false },
+        { playerName: 'B', isWinner: false, isScrewed: false },
+      ],
+    };
+
+    const res: any = await patchGame(
+      makeRequest(body),
+      { params: Promise.resolve({ id: 'g-1' }) }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects PATCH that mixes Royalty and Assassins as winners (KING winner-shape)', async () => {
+    mockCheckRateLimit.mockReturnValue({ allowed: true });
+    mockGameFindUnique.mockResolvedValue({ variant: 'KING' });
+
+    // 6 KING participants but winners mix one Royalty (King) with one Assassin —
+    // not a valid winning configuration; passes count + role-distribution checks
+    // but fails the team-shape rule.
+    const body = {
+      date: new Date('2026-05-01').toISOString(),
+      participants: [
+        { playerName: 'K', isWinner: true,  isScrewed: false, role: 'KING' },
+        { playerName: 'S1', isWinner: false, isScrewed: false, role: 'SQUIRE' },
+        { playerName: 'S2', isWinner: false, isScrewed: false, role: 'SQUIRE' },
+        { playerName: 'A1', isWinner: true,  isScrewed: false, role: 'ASSASSIN' },
+        { playerName: 'A2', isWinner: false, isScrewed: false, role: 'ASSASSIN' },
+        { playerName: 'A3', isWinner: false, isScrewed: false, role: 'ASSASSIN' },
+      ],
+    };
+
+    const res: any = await patchGame(
+      makeRequest(body),
+      { params: Promise.resolve({ id: 'g-1' }) }
+    );
+    expect(res.status).toBe(400);
+    // Optional: assert the message mentions winners or team — locks in the right rejection reason.
+    expect(JSON.stringify(res.body.error)).toMatch(/king|assassin|winner/i);
     expect(mockTransaction).not.toHaveBeenCalled();
   });
 });

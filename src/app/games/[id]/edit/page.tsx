@@ -40,10 +40,13 @@ export default function EditGamePage({ params }: { params: Promise<{ id: string 
   }, [id]);
 
   const handleSubmit = async (payload: GameFormPayload) => {
+    // PATCH: strip variant defensively — the API ignores it anyway, but
+    // omitting it from the wire payload matches the design intent.
+    const { variant: _omit, ...patchBody } = payload;
     const res = await fetch(`/api/games/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(patchBody),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -63,6 +66,7 @@ export default function EditGamePage({ params }: { params: Promise<{ id: string 
       {initial && (
         <GameForm
           playerCount={initial.rows.length}
+          variant={initial.variant}
           initial={initial}
           onSubmit={handleSubmit}
           submitLabel="Save changes"

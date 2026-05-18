@@ -1,80 +1,181 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // -----------------------------------------------------------------------------
-// GameParticipant validator (D-02, GAME-09 sanitization)
+// Variant + role enums (D-20, D-23 — see 2026-05-18-commander-variants-design.md)
 // -----------------------------------------------------------------------------
-// playerName: free-text per D-02 (no Player table); trimmed + non-empty per GAME-09
-// deckName: optional per D-02 (winner's deck matters most; others are bonus)
-// isWinner / isScrewed: boolean flags per D-03 (no winner FK on Game)
+export const GAME_VARIANTS = ['STANDARD', 'STAR', 'KING'] as const;
+export type GameVariant = (typeof GAME_VARIANTS)[number];
+
+export const PARTICIPANT_ROLES = ['KING', 'SQUIRE', 'ASSASSIN'] as const;
+export type ParticipantRole = (typeof PARTICIPANT_ROLES)[number];
+
+// -----------------------------------------------------------------------------
+// GameParticipant validator
+// -----------------------------------------------------------------------------
 export const gameParticipantSchema = z.object({
   playerName: z
     .string()
     .trim()
-    .min(1, "playerName is required")
-    .max(100, "playerName too long"),
+    .min(1, 'playerName is required')
+    .max(100, 'playerName too long'),
   isWinner: z.boolean(),
   isScrewed: z.boolean(),
   deckName: z
     .string()
     .trim()
-    .max(100, "deckName too long")
+    .max(100, 'deckName too long')
     .optional()
-    .transform((v) => (v === "" ? undefined : v)),
+    .transform((v) => (v === '' ? undefined : v)),
+  role: z
+    .enum(PARTICIPANT_ROLES)
+    .nullish()
+    .transform((v) => v ?? undefined),
 });
 
 export type GameParticipantInput = z.infer<typeof gameParticipantSchema>;
 
 // -----------------------------------------------------------------------------
-// Game validator (D-01, GAME-01 "1-8 players", GAME-09 sanitization)
+// Base game schema (no variant; shared by create + update)
 // -----------------------------------------------------------------------------
-// date: coerced from ISO string or Date (API bodies arrive as JSON strings)
-// wonByCombo: defaults to false per D-01 — Phase 6 form toggle
-// notes: optional per D-01; trimmed and length-clamped per GAME-09
-// participants: 1-8 entries (raised from 1-4 in 2026-05-15 game-tracking expansion);
-//   winner count NOT enforced here (Phase 6 may want to allow unresolved-winner
-//   drafts — defer to route)
-export const gameSchema = z.object({
+const baseGameSchema = z.object({
   date: z.coerce.date(),
   wonByCombo: z.boolean().default(false),
   notes: z
     .string()
     .trim()
-    .max(1000, "notes too long")
+    .max(1000, 'notes too long')
     .optional()
-    .transform((v) => (v === "" ? undefined : v)),
-  // Phase 6.1 D-14: defense-in-depth against duplicate player names within a single
-  // game. Client-side Combobox + excludeItems prevents the UX from producing duplicates
-  // (game-form.tsx), but the API must reject any direct POST/PATCH bypassing the form.
-  // Case-insensitive comparison — gameParticipantSchema.playerName already .trim()s, so
-  // leading/trailing whitespace collisions are normalized before this refine runs.
+    .transform((v) => (v === '' ? undefined : v)),
   participants: z
     .array(gameParticipantSchema)
-    .min(1, "at least one participant required")
-    .max(8, "at most eight participants per game")
+    .min(1, 'at least one participant required')
+    .max(8, 'at most eight participants per game')
     .refine(
       (arr) => new Set(arr.map((p) => p.playerName.toLowerCase())).size === arr.length,
-      { message: "duplicate player names not allowed" }
+      { message: 'duplicate player names not allowed' }
     ),
 });
 
-export type GameInput = z.infer<typeof gameSchema>;
+// -----------------------------------------------------------------------------
+// Variant invariants — shared by gameCreateSchema.superRefine and the PATCH route
+// -----------------------------------------------------------------------------
+type ParticipantForInvariants = {
+  isWinner: boolean;
+  role?: ParticipantRole | null;
+};
+
+type InvariantInput = { participants: ParticipantForInvariants[] };
+
+export type InvariantResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+export function applyVariantInvariants(
+  data: InvariantInput,
+  variant: GameVariant
+): InvariantResult {
+  const ps = data.participants;
+  const winnerCount = ps.filter((p) => p.isWinner).length;
+  const withRole = ps.filter((p) => p.role != null);
+
+  if (variant === 'STANDARD') {
+    if (winnerCount !== 1) {
+      return { ok: false, message: 'STANDARD game must have exactly one winner' };
+    }
+    if (withRole.length > 0) {
+      return { ok: false, message: 'STANDARD game participants must not have roles' };
+    }
+    return { ok: true };
+  }
+
+  if (variant === 'STAR') {
+    if (ps.length !== 5) {
+      return { ok: false, message: 'STAR game must have exactly 5 participants' };
+    }
+    if (winnerCount < 1 || winnerCount > 2) {
+      return { ok: false, message: 'STAR game must have 1 or 2 winners' };
+    }
+    if (withRole.length > 0) {
+      return { ok: false, message: 'STAR game participants must not have roles' };
+    }
+    return { ok: true };
+  }
+
+  // KING
+  if (ps.length < 6 || ps.length > 8) {
+    return { ok: false, message: 'KING game must have 6-8 participants' };
+  }
+  if (withRole.length !== ps.length) {
+    return { ok: false, message: 'KING game requires a role for every participant' };
+  }
+  const kings = ps.filter((p) => p.role === 'KING');
+  if (kings.length !== 1) {
+    return { ok: false, message: 'KING game must have exactly one KING' };
+  }
+  const others = ps.filter((p) => p.role !== 'KING');
+  const allSquireOrAssassin = others.every(
+    (p) => p.role === 'SQUIRE' || p.role === 'ASSASSIN'
+  );
+  if (!allSquireOrAssassin) {
+    return {
+      ok: false,
+      message: 'KING game non-king participants must be SQUIRE or ASSASSIN',
+    };
+  }
+
+  const winners = ps.filter((p) => p.isWinner);
+  const royaltyMembers = ps.filter(
+    (p) => p.role === 'KING' || p.role === 'SQUIRE'
+  );
+  const assassins = ps.filter((p) => p.role === 'ASSASSIN');
+
+  const isRoyaltyWin =
+    winners.length === royaltyMembers.length &&
+    winners.every((w) => w.role === 'KING' || w.role === 'SQUIRE');
+  const isAssassinWin =
+    winners.length === assassins.length &&
+    winners.length > 0 &&
+    winners.every((w) => w.role === 'ASSASSIN');
+
+  if (!isRoyaltyWin && !isAssassinWin) {
+    return {
+      ok: false,
+      message:
+        'KING game winners must be either {king + all squires} or {all assassins}',
+    };
+  }
+
+  return { ok: true };
+}
 
 // -----------------------------------------------------------------------------
-// SyncLog validator (D-06, D-07)
+// Create schema — sets variant (default STANDARD) and enforces invariants
 // -----------------------------------------------------------------------------
-// Granularity: one row per user per sync (D-06)
-// status: "success" | "failure" stored as string (D-07 — SQLite enum support awkward)
-// errorMessage: nullable, holds truncated error text on failure (D-07)
-// Phase 8 Discord alert will read rows WHERE status = "failure"
-export const syncLogSchema = z.object({
-  userId: z.string().min(1, "userId is required"),
-  status: z.enum(["success", "failure"]),
-  errorMessage: z
-    .string()
-    .max(2000, "errorMessage too long")
-    .optional()
-    .nullable()
-    .transform((v) => (v === "" ? null : v ?? null)),
-});
+export const gameCreateSchema = baseGameSchema
+  .extend({ variant: z.enum(GAME_VARIANTS).default('STANDARD') })
+  .superRefine((data, ctx) => {
+    const result = applyVariantInvariants(data, data.variant);
+    if (!result.ok) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.message,
+        path: ['participants'],
+      });
+    }
+  });
 
-export type SyncLogInput = z.infer<typeof syncLogSchema>;
+export type GameCreateInput = z.infer<typeof gameCreateSchema>;
+
+// -----------------------------------------------------------------------------
+// Update schema — no variant; PATCH route fetches the stored variant and runs
+// applyVariantInvariants separately after parsing.
+// -----------------------------------------------------------------------------
+export const gameUpdateSchema = baseGameSchema;
+export type GameUpdateInput = z.infer<typeof gameUpdateSchema>;
+
+// -----------------------------------------------------------------------------
+// Back-compat alias — keeps existing imports of `gameSchema` working until they
+// migrate to the explicit name in Task 3.
+// -----------------------------------------------------------------------------
+export const gameSchema = gameCreateSchema;
+export type GameInput = GameCreateInput;

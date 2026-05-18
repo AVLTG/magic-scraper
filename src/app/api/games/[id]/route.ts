@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { gameSchema } from '@/lib/validators';
+import {
+  gameUpdateSchema,
+  applyVariantInvariants,
+  type GameVariant,
+} from '@/lib/validators';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
 
 // Prisma "Record not found" error code for update/delete on missing row
@@ -14,6 +18,10 @@ function isPrismaNotFound(err: unknown): boolean {
     'code' in err &&
     (err as { code?: string }).code === PRISMA_NOT_FOUND
   );
+}
+
+function isGameVariant(value: unknown): value is GameVariant {
+  return value === 'STANDARD' || value === 'STAR' || value === 'KING';
 }
 
 export async function GET(
@@ -66,7 +74,36 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { date, wonByCombo, notes, participants } = gameSchema.parse(body);
+    const parsed = gameUpdateSchema.parse(body);
+
+    const existing = await prisma.game.findUnique({
+      where: { id },
+      select: { variant: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    const variant = existing.variant;
+    if (!isGameVariant(variant)) {
+      console.error('PATCH /api/games/[id]: invalid stored variant', { id, variant });
+      return NextResponse.json(
+        { error: 'Invalid stored variant' },
+        { status: 500 }
+      );
+    }
+    const invariantResult = applyVariantInvariants(
+      { participants: parsed.participants },
+      variant
+    );
+    if (!invariantResult.ok) {
+      return NextResponse.json(
+        { error: [{ message: invariantResult.message, path: ['participants'] }] },
+        { status: 400 }
+      );
+    }
+
+    const { date, wonByCombo, notes, participants } = parsed;
     const updated = await prisma.$transaction(async (tx) => {
       await tx.gameParticipant.deleteMany({ where: { gameId: id } });
       const g = await tx.game.update({
@@ -80,6 +117,7 @@ export async function PATCH(
           isWinner: p.isWinner,
           isScrewed: p.isScrewed,
           deckName: p.deckName,
+          role: p.role,
         })),
       });
       return g;

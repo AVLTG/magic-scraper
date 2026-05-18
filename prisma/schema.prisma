@@ -46,6 +46,7 @@ model Game {
   notes        String?
   isImported        Boolean             @default(false)
   discordNotified   Boolean             @default(false)
+  variant           String              @default("STANDARD")
   createdAt         DateTime            @default(now())
 
   participants GameParticipant[]
@@ -61,6 +62,7 @@ model GameParticipant {
   isWinner    Boolean
   isScrewed   Boolean
   deckName    String?
+  role        String?
 
   game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
