@@ -410,7 +410,7 @@ export default function GamesPage() {
                         <>
                           {winner.playerName}
                           {winner.isRandom && (
-                            <span aria-label="Random player" title="Random player"> ★</span>
+                            <span aria-label="Random player (not counted toward deck stats)" title="Random (not counted toward deck stats)">*</span>
                           )}
                           {winner.deckName ? ` (${winner.deckName})` : ''}
                         </>
@@ -447,7 +447,7 @@ export default function GamesPage() {
                               <span className="font-medium text-foreground">
                                 {p.playerName}
                                 {p.isRandom && (
-                                  <span aria-label="Random player" title="Random player"> ★</span>
+                                  <span aria-label="Random player (not counted toward deck stats)" title="Random (not counted toward deck stats)">*</span>
                                 )}
                               </span>
                               {p.deckName && <span className="text-muted">({p.deckName})</span>}
