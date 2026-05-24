@@ -3,7 +3,7 @@ import { z } from 'zod';
 // -----------------------------------------------------------------------------
 // Variant + role enums (D-20, D-23 — see 2026-05-18-commander-variants-design.md)
 // -----------------------------------------------------------------------------
-export const GAME_VARIANTS = ['STANDARD', 'STAR', 'KING'] as const;
+export const GAME_VARIANTS = ['COMMANDER', 'STAR', 'KING'] as const;
 export type GameVariant = (typeof GAME_VARIANTS)[number];
 
 export const PARTICIPANT_ROLES = ['KING', 'SQUIRE', 'ASSASSIN'] as const;
@@ -83,12 +83,12 @@ export function applyVariantInvariants(
   const winnerCount = ps.filter((p) => p.isWinner).length;
   const withRole = ps.filter((p) => p.role != null);
 
-  if (variant === 'STANDARD') {
+  if (variant === 'COMMANDER') {
     if (winnerCount !== 1) {
-      return { ok: false, message: 'STANDARD game must have exactly one winner' };
+      return { ok: false, message: 'COMMANDER game must have exactly one winner' };
     }
     if (withRole.length > 0) {
-      return { ok: false, message: 'STANDARD game participants must not have roles' };
+      return { ok: false, message: 'COMMANDER game participants must not have roles' };
     }
     return { ok: true };
   }
@@ -154,10 +154,10 @@ export function applyVariantInvariants(
 }
 
 // -----------------------------------------------------------------------------
-// Create schema — sets variant (default STANDARD) and enforces invariants
+// Create schema — sets variant (default COMMANDER) and enforces invariants
 // -----------------------------------------------------------------------------
 export const gameCreateSchema = baseGameSchema
-  .extend({ variant: z.enum(GAME_VARIANTS).default('STANDARD') })
+  .extend({ variant: z.enum(GAME_VARIANTS).default('COMMANDER') })
   .superRefine((data, ctx) => {
     const result = applyVariantInvariants(data, data.variant);
     if (!result.ok) {

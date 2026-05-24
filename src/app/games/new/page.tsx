@@ -10,7 +10,7 @@ type NotifyStatus = 'idle' | 'sending' | 'sent' | 'error';
 const PLAYER_COUNT_OPTIONS = [2, 3, 4, 5, 6, 7, 8] as const;
 
 export interface VariantQuestion {
-  variantOnYes: Exclude<GameVariant, 'STANDARD'>;
+  variantOnYes: Exclude<GameVariant, 'COMMANDER'>;
   label: string;
 }
 
@@ -140,7 +140,7 @@ export default function NewGamePage() {
                 onClick={() => {
                   setPlayerCount(n);
                   if (variantQuestionForCount(n) === null) {
-                    setVariant('STANDARD');
+                    setVariant('COMMANDER');
                   }
                 }}
                 className="basis-[calc((100%-1.5rem)/4)] py-3 rounded-md border border-border bg-surface text-foreground font-medium hover:bg-accent hover:text-background transition-colors min-h-[44px]"
@@ -186,7 +186,7 @@ export default function NewGamePage() {
             </button>
             <button
               type="button"
-              onClick={() => setVariant('STANDARD')}
+              onClick={() => setVariant('COMMANDER')}
               className="flex-1 py-3 rounded-md border border-border bg-surface text-foreground font-medium hover:bg-accent hover:text-background transition-colors min-h-[44px]"
             >
               No
@@ -213,7 +213,7 @@ export default function NewGamePage() {
   return (
     <main className="container mx-auto px-4 py-6">
       <h1 className="text-2xl font-bold text-foreground mb-4">
-        Log a {playerCount}-player game{variant !== 'STANDARD' ? ` (${variant === 'STAR' ? 'Star' : 'King'} Commander)` : ''}
+        Log a {playerCount}-player game{variant !== 'COMMANDER' ? ` (${variant === 'STAR' ? 'Star' : 'King'} Commander)` : ''}
       </h1>
       <GameForm playerCount={playerCount} variant={variant} onSubmit={handleSubmit} submitLabel="Save game" />
     </main>

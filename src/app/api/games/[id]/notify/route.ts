@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendDiscordAlert } from '@/lib/discord';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { buildNotifyMessage } from '@/lib/notifyMessage';
 
 export async function POST(
   request: Request,
@@ -32,12 +33,21 @@ export async function POST(
         { status: 409 }
       );
     }
-    const winner = game.participants.find((p) => p.isWinner);
-    const winnerName = winner?.playerName ?? 'Someone';
-    const deckDisplay = winner?.deckName ?? 'a deck they forgot to list';
-    const comboText = game.wonByCombo ? 'via combo' : 'without any combos';
     const origin = new URL(request.url).origin;
-    const message = `New game added! ${winnerName} won using ${deckDisplay} ${comboText}. Check it out at ${origin}/games`;
+    const message = buildNotifyMessage(
+      {
+        variant: game.variant,
+        wonByCombo: game.wonByCombo,
+        participants: game.participants.map((p) => ({
+          playerName: p.playerName,
+          isWinner: p.isWinner,
+          isRandom: p.isRandom,
+          deckName: p.deckName,
+          role: p.role,
+        })),
+      },
+      origin
+    );
 
     await sendDiscordAlert({ content: message });
     await prisma.game.update({

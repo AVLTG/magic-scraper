@@ -36,7 +36,7 @@ function baseState(
     winnerIndices: [],
     roles: rows.map(() => null) as (ParticipantRole | null)[],
     winningTeam: null as 'ROYALTY' | 'ASSASSINS' | null,
-    variant: 'STANDARD' as GameVariant,
+    variant: 'COMMANDER' as GameVariant,
     ...overrides,
   };
 }
@@ -347,15 +347,15 @@ describe('validateGameForm — KING variant', () => {
   });
 });
 
-describe('validateGameForm — STANDARD passthrough', () => {
+describe('validateGameForm — COMMANDER passthrough', () => {
   it('still works with the new state shape (defaults pass through)', () => {
-    const state = baseStateV('STANDARD', [
+    const state = baseStateV('COMMANDER', [
       row('A', { isWinner: true }), row('B'),
     ], { winnerIndex: 0 });
     const result = validateGameForm(state);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.payload.variant).toBe('STANDARD');
+      expect(result.payload.variant).toBe('COMMANDER');
       expect(result.payload.participants[0].isWinner).toBe(true);
       expect(result.payload.participants.every((p) => p.role === undefined)).toBe(true);
     }

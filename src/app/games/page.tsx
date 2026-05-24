@@ -2,6 +2,8 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { DeleteConfirmModal } from '@/app/games/delete-confirm-modal';
+import { getVariantBadge } from '@/lib/gameVariants';
+import { getDisplayWinner } from '@/lib/gameDisplay';
 
 interface Participant {
   id: string;
@@ -11,12 +13,14 @@ interface Participant {
   isScrewed: boolean;
   isRandom: boolean;
   deckName: string | null;
+  role?: string | null;
 }
 
 interface Game {
   id: string;
   date: string;
   wonByCombo: boolean;
+  variant: string;
   isImported: boolean;
   notes: string | null;
   createdAt: string;
@@ -389,6 +393,7 @@ export default function GamesPage() {
           <thead>
             <tr className="border-b border-border text-left text-sm text-muted">
               <th className="py-2 pr-4">Date</th>
+              <th className="py-2 pr-4">Format</th>
               <th className="py-2 pr-4">Winner</th>
               <th className="py-2 pr-4">Players</th>
               <th className="py-2 pr-4 hidden sm:table-cell">Notes</th>
@@ -397,7 +402,7 @@ export default function GamesPage() {
           </thead>
           <tbody>
             {filteredGames.map((g) => {
-              const winner = g.participants.find((p) => p.isWinner);
+              const displayWinner = getDisplayWinner(g);
               return (
                 <Fragment key={g.id}>
                   <tr
@@ -405,14 +410,27 @@ export default function GamesPage() {
                     onClick={() => toggleExpanded(g.id)}
                   >
                     <td className="py-2 pr-4 text-sm text-foreground">{formatDate(g.date)}</td>
+                    <td className="py-2 pr-4">
+                      {(() => {
+                        const badge = getVariantBadge(g.variant);
+                        return (
+                          <span
+                            className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${badge.classes}`}
+                          >
+                            {badge.label}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="py-2 pr-4 text-sm text-foreground">
-                      {winner ? (
+                      {displayWinner ? (
                         <>
-                          {winner.playerName}
-                          {winner.isRandom && (
+                          {displayWinner.primary.playerName}
+                          {displayWinner.primary.isRandom && (
                             <span aria-label="Random player (not counted toward deck stats)" title="Random (not counted toward deck stats)">*</span>
                           )}
-                          {winner.deckName ? ` (${winner.deckName})` : ''}
+                          {displayWinner.primary.deckName ? ` (${displayWinner.primary.deckName})` : ''}
+                          {displayWinner.othersCount > 0 && ` + ${displayWinner.othersCount} other${displayWinner.othersCount === 1 ? '' : 's'}`}
                         </>
                       ) : (
                         '—'
@@ -440,7 +458,7 @@ export default function GamesPage() {
                   </tr>
                   {expanded.has(g.id) && (
                     <tr className="bg-surface">
-                      <td colSpan={5} className="py-3 px-4">
+                      <td colSpan={6} className="py-3 px-4">
                         <ul className="space-y-1 text-sm">
                           {g.participants.map((p) => (
                             <li key={p.id} className="flex items-center gap-3">

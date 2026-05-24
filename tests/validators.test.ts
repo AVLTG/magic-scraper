@@ -29,24 +29,24 @@ function p(
 
 describe('GAME_VARIANTS / PARTICIPANT_ROLES constants', () => {
   it('exports the expected variant values', () => {
-    expect(GAME_VARIANTS).toEqual(['STANDARD', 'STAR', 'KING']);
+    expect(GAME_VARIANTS).toEqual(['COMMANDER', 'STAR', 'KING']);
   });
   it('exports the expected role values', () => {
     expect(PARTICIPANT_ROLES).toEqual(['KING', 'SQUIRE', 'ASSASSIN']);
   });
 });
 
-describe('gameCreateSchema — STANDARD', () => {
-  it('accepts a 4-player STANDARD game with exactly one winner', () => {
+describe('gameCreateSchema — COMMANDER', () => {
+  it('accepts a 4-player COMMANDER game with exactly one winner', () => {
     const res = gameCreateSchema.safeParse({
       date: baseDate,
       participants: [p('A', { isWinner: true }), p('B'), p('C'), p('D')],
     });
     expect(res.success).toBe(true);
-    if (res.success) expect(res.data.variant).toBe('STANDARD');
+    if (res.success) expect(res.data.variant).toBe('COMMANDER');
   });
 
-  it('rejects STANDARD with two winners', () => {
+  it('rejects COMMANDER with two winners', () => {
     const res = gameCreateSchema.safeParse({
       date: baseDate,
       participants: [p('A', { isWinner: true }), p('B', { isWinner: true })],
@@ -54,7 +54,7 @@ describe('gameCreateSchema — STANDARD', () => {
     expect(res.success).toBe(false);
   });
 
-  it('rejects STANDARD with zero winners', () => {
+  it('rejects COMMANDER with zero winners', () => {
     const res = gameCreateSchema.safeParse({
       date: baseDate,
       participants: [p('A'), p('B')],
@@ -62,7 +62,7 @@ describe('gameCreateSchema — STANDARD', () => {
     expect(res.success).toBe(false);
   });
 
-  it('rejects STANDARD when any participant has a role set', () => {
+  it('rejects COMMANDER when any participant has a role set', () => {
     const res = gameCreateSchema.safeParse({
       date: baseDate,
       participants: [p('A', { isWinner: true, role: 'KING' }), p('B')],
@@ -266,15 +266,15 @@ describe('gameCreateSchema — KING', () => {
 });
 
 describe('applyVariantInvariants — used by PATCH route', () => {
-  it('accepts a STANDARD body against a STANDARD variant', () => {
+  it('accepts a COMMANDER body against a COMMANDER variant', () => {
     const result = applyVariantInvariants(
       { participants: [p('A', { isWinner: true }), p('B')] },
-      'STANDARD'
+      'COMMANDER'
     );
     expect(result.ok).toBe(true);
   });
 
-  it('rejects a STANDARD body against a KING variant (wrong roles)', () => {
+  it('rejects a COMMANDER body against a KING variant (wrong roles)', () => {
     const result = applyVariantInvariants(
       { participants: [p('A', { isWinner: true }), p('B')] },
       'KING'
@@ -309,10 +309,10 @@ describe('gameUpdateSchema — body has no variant; invariants deferred to route
     expect(res.success).toBe(true);
   });
 
-  it('does NOT enforce STANDARD invariants (variant check happens in route, not schema)', () => {
+  it('does NOT enforce COMMANDER invariants (variant check happens in route, not schema)', () => {
     const res = gameUpdateSchema.safeParse({
       date: baseDate,
-      participants: [p('A'), p('B')], // zero winners — would fail STANDARD invariant in create
+      participants: [p('A'), p('B')], // zero winners — would fail COMMANDER invariant in create
     });
     expect(res.success).toBe(true);
   });

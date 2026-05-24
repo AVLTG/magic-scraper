@@ -30,6 +30,7 @@ function mkGame(id: string, participants: ReturnType<typeof mkParticipant>[]): G
     id,
     date: '2026-04-10T00:00:00.000Z',
     wonByCombo: false,
+    variant: 'COMMANDER',
     isImported: false,
     notes: null,
     createdAt: '2026-04-10T00:00:00.000Z',

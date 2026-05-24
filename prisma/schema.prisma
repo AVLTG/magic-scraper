@@ -46,7 +46,7 @@ model Game {
   notes        String?
   isImported        Boolean             @default(false)
   discordNotified   Boolean             @default(false)
-  variant           String              @default("STANDARD")
+  variant           String              @default("COMMANDER")
   createdAt         DateTime            @default(now())
 
   participants GameParticipant[]

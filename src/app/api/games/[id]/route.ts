@@ -21,7 +21,7 @@ function isPrismaNotFound(err: unknown): boolean {
 }
 
 function isGameVariant(value: unknown): value is GameVariant {
-  return value === 'STANDARD' || value === 'STAR' || value === 'KING';
+  return value === 'COMMANDER' || value === 'STAR' || value === 'KING';
 }
 
 export async function GET(

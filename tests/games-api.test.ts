@@ -529,7 +529,7 @@ describe('PATCH /api/games/[id]', () => {
   });
 
   it('full-replace: deletes existing participants, updates game, creates new participants', async () => {
-    mockGameFindUnique.mockResolvedValue({ variant: 'STANDARD' });
+    mockGameFindUnique.mockResolvedValue({ variant: 'COMMANDER' });
     mockParticipantDeleteMany.mockResolvedValue({ count: 2 });
     mockGameUpdate.mockResolvedValue({
       id: 'g1',
@@ -572,7 +572,7 @@ describe('PATCH /api/games/[id]', () => {
 
   it('returns 404 when update targets missing id (P2025)', async () => {
     mockCheckRateLimit.mockReturnValue({ allowed: true });
-    mockGameFindUnique.mockResolvedValue({ variant: 'STANDARD' });
+    mockGameFindUnique.mockResolvedValue({ variant: 'COMMANDER' });
     mockTransaction.mockRejectedValue({ code: 'P2025' });
 
     const body = {

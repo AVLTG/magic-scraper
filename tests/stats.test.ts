@@ -46,7 +46,7 @@ function mkParticipant(
 function mkGame(
   date: string,
   participants: ReturnType<typeof mkParticipant>[],
-  opts: { wonByCombo?: boolean; isImported?: boolean } = {}
+  opts: { wonByCombo?: boolean; isImported?: boolean; variant?: string } = {}
 ): Game {
   const id = `g-${++idCounter}`;
   for (const p of participants) p.gameId = id;
@@ -54,6 +54,7 @@ function mkGame(
     id,
     date: new Date(date + 'T00:00:00Z').toISOString(),
     wonByCombo: opts.wonByCombo ?? false,
+    variant: opts.variant ?? 'COMMANDER',
     isImported: opts.isImported ?? false,
     notes: null,
     createdAt: new Date().toISOString(),

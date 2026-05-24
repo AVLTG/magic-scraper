@@ -20,7 +20,7 @@ export interface GameFormState {
   notes: string;
   wonByCombo: boolean;
   rows: ParticipantRow[];
-  winnerIndex: number;                    // STANDARD only
+  winnerIndex: number;                    // COMMANDER only
   winnerIndices: number[];                // STAR only (0-2 entries)
   roles: (ParticipantRole | null)[];      // KING only — index-aligned with rows
   winningTeam: WinningTeam | null;        // KING only
@@ -96,7 +96,7 @@ export function validateGameForm(state: GameFormState): ValidationResult {
   if (Object.keys(rowErrors).length > 0) errors.rows = rowErrors;
 
   if (!errors.form) {
-    if (state.variant === 'STANDARD') {
+    if (state.variant === 'COMMANDER') {
       if (state.winnerIndex < 0 || state.winnerIndex >= state.rows.length) {
         errors.form = 'Exactly one winner required';
       }
@@ -125,7 +125,7 @@ export function validateGameForm(state: GameFormState): ValidationResult {
     let isWinner = false;
     let role: ParticipantRole | undefined;
 
-    if (state.variant === 'STANDARD') {
+    if (state.variant === 'COMMANDER') {
       isWinner = i === state.winnerIndex;
     } else if (state.variant === 'STAR') {
       isWinner = state.winnerIndices.includes(i);
@@ -179,7 +179,7 @@ export function buildInitialState(game: {
     role?: ParticipantRole | null;
   }[];
 }): GameFormState {
-  const variant: GameVariant = game.variant ?? 'STANDARD';
+  const variant: GameVariant = game.variant ?? 'COMMANDER';
   const rows: ParticipantRow[] = game.participants.map((p) => ({
     playerName: p.playerName,
     deckName: p.deckName ?? '',
@@ -235,7 +235,7 @@ export interface GameFormProps {
 
 export function GameForm({
   playerCount,
-  variant = 'STANDARD',
+  variant = 'COMMANDER',
   initial,
   submitLabel = 'Save game',
   onSubmit,
@@ -414,7 +414,7 @@ export function GameForm({
               placeholder="Deck (optional)"
               addLabel="deck"
             />
-            {state.variant === 'STANDARD' && (
+            {state.variant === 'COMMANDER' && (
               <label className="flex items-center gap-1 text-xs text-muted">
                 <input
                   type="radio"
