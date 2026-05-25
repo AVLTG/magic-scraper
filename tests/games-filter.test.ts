@@ -25,12 +25,18 @@ function mkParticipant(
   };
 }
 
-function mkGame(id: string, participants: ReturnType<typeof mkParticipant>[]): Game {
+function mkGame(
+  id: string,
+  participants: ReturnType<typeof mkParticipant>[],
+  opts: { variant?: string } = {}
+): Game {
   return {
     id,
     date: '2026-04-10T00:00:00.000Z',
     wonByCombo: false,
-    variant: 'COMMANDER',
+    variant: opts.variant ?? 'COMMANDER',
+    bestOf: null,
+    comboWins: null,
     isImported: false,
     notes: null,
     createdAt: '2026-04-10T00:00:00.000Z',
@@ -38,7 +44,7 @@ function mkGame(id: string, participants: ReturnType<typeof mkParticipant>[]): G
   };
 }
 
-const EMPTY_FILTERS: FilterState = { winner: null, playerCount: null, players: [], decks: [] };
+const EMPTY_FILTERS: FilterState = { winner: null, playerCount: null, players: [], decks: [], formats: [] };
 
 describe('matchesAllFilters (D-17)', () => {
   const gameAB = mkGame('g1', [mkParticipant('Alice', true), mkParticipant('Bob')]);
@@ -91,8 +97,8 @@ describe('matchesAllFilters (D-17)', () => {
         mkParticipant('E'),
         mkParticipant('F'),
       ]);
-      expect(matchesAllFilters(game6, { winner: null, playerCount: 6, players: [], decks: [] })).toBe(true);
-      expect(matchesAllFilters(game6, { winner: null, playerCount: 4, players: [], decks: [] })).toBe(false);
+      expect(matchesAllFilters(game6, { winner: null, playerCount: 6, players: [], decks: [], formats: [] })).toBe(true);
+      expect(matchesAllFilters(game6, { winner: null, playerCount: 4, players: [], decks: [], formats: [] })).toBe(false);
     });
   });
 
@@ -114,15 +120,15 @@ describe('matchesAllFilters (D-17)', () => {
   describe('AND-across-types combine (D-17)', () => {
     it('requires all active filter types to pass', () => {
       expect(
-        matchesAllFilters(gameABCD, { winner: 'Carol', playerCount: 4, players: ['Bob', 'Zara'], decks: [] })
+        matchesAllFilters(gameABCD, { winner: 'Carol', playerCount: 4, players: ['Bob', 'Zara'], decks: [], formats: [] })
       ).toBe(true);
     });
     it('rejects when one filter type fails', () => {
       expect(
-        matchesAllFilters(gameABC, { winner: 'Alice', playerCount: 4, players: ['Alice'], decks: [] })
+        matchesAllFilters(gameABC, { winner: 'Alice', playerCount: 4, players: ['Alice'], decks: [], formats: [] })
       ).toBe(false); // count 3 != 4
       expect(
-        matchesAllFilters(gameABCD, { winner: 'Alice', playerCount: 4, players: ['Alice'], decks: [] })
+        matchesAllFilters(gameABCD, { winner: 'Alice', playerCount: 4, players: ['Alice'], decks: [], formats: [] })
       ).toBe(false); // winner is Carol, not Alice
     });
   });
@@ -385,5 +391,44 @@ describe('matchesAllFilters — random handling', () => {
   it('decks filter ignores decks played only by randoms', () => {
     expect(matchesAllFilters(aliceVsRandom, { ...EMPTY_FILTERS, decks: ['Selvala'] })).toBe(false);
     expect(matchesAllFilters(aliceVsRandom, { ...EMPTY_FILTERS, decks: ['Atraxa'] })).toBe(true);
+  });
+});
+
+describe('matchesAllFilters — formats (D-40)', () => {
+  const cmd = mkGame('g-cmd', [mkParticipant('Alice', true)]);
+  const std = mkGame('g-std', [
+    mkParticipant('Alice', true),
+    mkParticipant('Bob'),
+  ], { variant: 'STANDARD' });
+  const pauper = mkGame('g-pauper', [
+    mkParticipant('Alice', true),
+    mkParticipant('Bob'),
+  ], { variant: 'PAUPER' });
+
+  it('empty formats[] matches every variant', () => {
+    expect(matchesAllFilters(cmd, EMPTY_FILTERS)).toBe(true);
+    expect(matchesAllFilters(std, EMPTY_FILTERS)).toBe(true);
+    expect(matchesAllFilters(pauper, EMPTY_FILTERS)).toBe(true);
+  });
+
+  it('single format filters to only that variant', () => {
+    const f = { ...EMPTY_FILTERS, formats: ['STANDARD'] };
+    expect(matchesAllFilters(cmd, f)).toBe(false);
+    expect(matchesAllFilters(std, f)).toBe(true);
+    expect(matchesAllFilters(pauper, f)).toBe(false);
+  });
+
+  it('multiple formats OR within the filter', () => {
+    const f = { ...EMPTY_FILTERS, formats: ['COMMANDER', 'PAUPER'] };
+    expect(matchesAllFilters(cmd, f)).toBe(true);
+    expect(matchesAllFilters(std, f)).toBe(false);
+    expect(matchesAllFilters(pauper, f)).toBe(true);
+  });
+
+  it('format filter ANDs with other filter types', () => {
+    const fNoMatch = { ...EMPTY_FILTERS, formats: ['STANDARD'], winner: 'C' };
+    expect(matchesAllFilters(std, fNoMatch)).toBe(false);
+    const fMatch = { ...EMPTY_FILTERS, formats: ['STANDARD'], winner: 'Alice' };
+    expect(matchesAllFilters(std, fMatch)).toBe(true);
   });
 });

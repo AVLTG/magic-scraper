@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { DeleteConfirmModal } from '@/app/games/delete-confirm-modal';
 import { getVariantBadge } from '@/lib/gameVariants';
 import { getDisplayWinner } from '@/lib/gameDisplay';
+import { ALL_FORMATS, FORMAT_LABELS } from '@/lib/gameFormats';
 
 interface Participant {
   id: string;
@@ -21,6 +22,8 @@ interface Game {
   date: string;
   wonByCombo: boolean;
   variant: string;
+  bestOf: number | null;
+  comboWins: number | null;
   isImported: boolean;
   notes: string | null;
   createdAt: string;
@@ -37,6 +40,7 @@ export interface FilterState {
   playerCount: 2 | 3 | 4 | 5 | 6 | 7 | 8 | null;
   players: string[];
   decks: string[];
+  formats: string[];
 }
 
 /**
@@ -74,6 +78,9 @@ export function matchesAllFilters(game: Game, filters: FilterState): boolean {
     );
     const anyMatch = filters.decks.some((d) => usedDecks.has(d));
     if (!anyMatch) return false;
+  }
+  if (filters.formats.length > 0) {
+    if (!filters.formats.includes(game.variant)) return false;
   }
   return true;
 }
@@ -151,6 +158,7 @@ export default function GamesPage() {
   const [countFilter, setCountFilter] = useState<2 | 3 | 4 | 5 | 6 | 7 | 8 | null>(null);
   const [playerFilters, setPlayerFilters] = useState<string[]>([]);
   const [deckFilters, setDeckFilters] = useState<string[]>([]);
+  const [formatFilters, setFormatFilters] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,9 +219,10 @@ export default function GamesPage() {
           playerCount: countFilter,
           players: playerFilters,
           decks: deckFilters,
+          formats: formatFilters,
         })
       ),
-    [games, winnerFilter, countFilter, playerFilters, deckFilters]
+    [games, winnerFilter, countFilter, playerFilters, deckFilters, formatFilters]
   );
 
   // Phase 6.1 D-23: any filter active?
@@ -221,13 +230,15 @@ export default function GamesPage() {
     winnerFilter !== null ||
     countFilter !== null ||
     playerFilters.length > 0 ||
-    deckFilters.length > 0;
+    deckFilters.length > 0 ||
+    formatFilters.length > 0;
 
   const clearFilters = () => {
     setWinnerFilter(null);
     setCountFilter(null);
     setPlayerFilters([]);
     setDeckFilters([]);
+    setFormatFilters([]);
   };
 
   const togglePlayerFilter = (name: string) => {
@@ -239,6 +250,12 @@ export default function GamesPage() {
   const toggleDeckFilter = (name: string) => {
     setDeckFilters((prev) =>
       prev.includes(name) ? prev.filter((d) => d !== name) : [...prev, name]
+    );
+  };
+
+  const toggleFormatFilter = (name: string) => {
+    setFormatFilters((prev) =>
+      prev.includes(name) ? prev.filter((f) => f !== name) : [...prev, name]
     );
   };
 
@@ -256,6 +273,34 @@ export default function GamesPage() {
 
       {games.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[12rem]">
+            <label className="block text-xs text-muted mb-1">
+              Format {formatFilters.length > 0 && `(${formatFilters.length} selected)`}
+            </label>
+            <details className="relative">
+              <summary className="px-3 py-2 rounded-md border border-border bg-surface text-foreground text-sm cursor-pointer list-none">
+                {formatFilters.length === 0
+                  ? 'Any format'
+                  : formatFilters.map((v) => FORMAT_LABELS[v as keyof typeof FORMAT_LABELS] ?? v).join(', ')}
+              </summary>
+              <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-surface shadow-lg p-2">
+                {ALL_FORMATS.map((v) => (
+                  <label
+                    key={v}
+                    className="flex items-center gap-2 px-1 py-1 text-sm text-foreground hover:bg-surface-hover rounded cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formatFilters.includes(v)}
+                      onChange={() => toggleFormatFilter(v)}
+                    />
+                    <span>{FORMAT_LABELS[v]}</span>
+                  </label>
+                ))}
+              </div>
+            </details>
+          </div>
+
           <div>
             <label className="block text-xs text-muted mb-1">Winner</label>
             <select
@@ -414,11 +459,18 @@ export default function GamesPage() {
                       {(() => {
                         const badge = getVariantBadge(g.variant);
                         return (
-                          <span
-                            className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${badge.classes}`}
-                          >
-                            {badge.label}
-                          </span>
+                          <div className="flex gap-1 items-center flex-wrap">
+                            <span
+                              className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${badge.classes}`}
+                            >
+                              {badge.label}
+                            </span>
+                            {g.bestOf != null && (
+                              <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-surface text-muted border border-border">
+                                Bo{g.bestOf}
+                              </span>
+                            )}
+                          </div>
                         );
                       })()}
                     </td>
@@ -477,8 +529,12 @@ export default function GamesPage() {
                               )}
                             </li>
                           ))}
-                          {g.wonByCombo && (
-                            <li className="text-xs text-muted italic">Won by combo</li>
+                          {g.bestOf != null ? (
+                            <li className="text-xs text-muted italic">
+                              Combo wins: {g.comboWins ?? 0}/{Math.ceil(g.bestOf / 2)}
+                            </li>
+                          ) : (
+                            g.wonByCombo && <li className="text-xs text-muted italic">Won by combo</li>
                           )}
                         </ul>
                       </td>

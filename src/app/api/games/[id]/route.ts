@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import {
   gameUpdateSchema,
   applyVariantInvariants,
+  GAME_VARIANTS,
   type GameVariant,
 } from '@/lib/validators';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
@@ -21,7 +22,7 @@ function isPrismaNotFound(err: unknown): boolean {
 }
 
 function isGameVariant(value: unknown): value is GameVariant {
-  return value === 'COMMANDER' || value === 'STAR' || value === 'KING';
+  return typeof value === 'string' && (GAME_VARIANTS as readonly string[]).includes(value);
 }
 
 export async function GET(
@@ -78,7 +79,7 @@ export async function PATCH(
 
     const existing = await prisma.game.findUnique({
       where: { id },
-      select: { variant: true },
+      select: { variant: true, bestOf: true, comboWins: true },
     });
     if (!existing) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -93,7 +94,11 @@ export async function PATCH(
       );
     }
     const invariantResult = applyVariantInvariants(
-      { participants: parsed.participants },
+      {
+        participants: parsed.participants,
+        bestOf: existing.bestOf,
+        comboWins: existing.comboWins,
+      },
       variant
     );
     if (!invariantResult.ok) {

@@ -21,6 +21,8 @@ function mkGame(over: Partial<Game>): Game {
     date: '2026-05-23T00:00:00.000Z',
     wonByCombo: false,
     variant: 'COMMANDER',
+    bestOf: null,
+    comboWins: null,
     isImported: false,
     notes: null,
     createdAt: '2026-05-23T00:00:00.000Z',

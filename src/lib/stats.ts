@@ -9,6 +9,7 @@
  */
 
 import type { Game } from '@/app/games/page';
+import { isCommanderFormat } from '@/lib/gameFormats';
 
 // Player-stat bucket name for participants flagged isRandom — single string
 // reused across every player-aggregating helper. Deck-aggregating helpers
@@ -58,6 +59,7 @@ export function weeksBetween(startWeek: string, endWeek: string): string[] {
 export function computePlayerWinRate(
   games: Game[]
 ): { player: string; wins: number; played: number; rate: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   const map = new Map<string, { wins: number; played: number }>();
   for (const g of games) {
     const playedBuckets = new Set<string>();
@@ -94,6 +96,7 @@ export function computePlayerWinRate(
 export function computeDeckWinRate(
   games: Game[]
 ): { deck: string; wins: number; played: number; rate: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   const nonImported = games.filter((g) => !g.isImported);
   const deckPlayed = new Map<string, Set<string>>(); // deck -> set of gameIds
   const deckWins = new Map<string, number>();
@@ -148,6 +151,7 @@ export function computeDeckWinRate(
 export function computeScrewedRate(
   games: Game[]
 ): { player: string; screwed: number; played: number; rate: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   const map = new Map<string, { screwed: number; played: number }>();
   for (const g of games) {
     const playedBuckets = new Set<string>();
@@ -186,6 +190,7 @@ export function computeScrewedRate(
 export function computeWeeklyFrequency(
   games: Game[]
 ): { weekStart: string; gameCount: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   if (games.length === 0) return [];
 
   const weekCounts = new Map<string, number>();
@@ -208,6 +213,7 @@ export function computeWeeklyFrequency(
 export function computeMostLikelyToPlay(
   games: Game[]
 ): { player: string; participations: number; totalGames: number; rate: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   if (games.length === 0) return [];
   const totalGames = games.length;
   const map = new Map<string, number>();
@@ -239,6 +245,7 @@ export function computeMostLikelyToPlay(
 export function computeMostLikelyToPlayBump(
   games: Game[]
 ): { weekStart: string; ranks: { player: string; rank: number }[] }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   if (games.length === 0) return [];
 
   // Sort games chronologically
@@ -307,6 +314,7 @@ export function computeMostLikelyToPlayBump(
 export function computeWinsByPlayerPie(
   games: Game[]
 ): { player: string; wins: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   const map = new Map<string, number>();
   for (const g of games) {
     const winningBuckets = new Set<string>();
@@ -332,6 +340,7 @@ export function computeWinsByPlayerPie(
 export function computeGamesByDeckPie(
   games: Game[]
 ): { deck: string; games: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   const nonImported = games.filter((g) => !g.isImported);
   const map = new Map<string, number>();
   for (const g of nonImported) {
@@ -360,6 +369,7 @@ export function computeGamesByDeckPie(
 export function computePlayerRadar(
   games: Game[]
 ): { player: string; played: number; wins: number; screwed: number; wonByCombo: number; nonImportedPlayed: number; totalGames: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   const totalGames = games.length;
   type Entry = { played: number; wins: number; screwed: number; wonByCombo: number; nonImportedPlayed: number };
   const map = new Map<string, Entry>();
@@ -421,6 +431,7 @@ const TIMEFRAME_DAYS: Record<Exclude<Timeframe, 'all'>, number> = {
 };
 
 export function filterGamesByTimeframe(games: Game[], timeframe: Timeframe): Game[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   if (timeframe === 'all') return games;
   const cutoffMs = Date.now() - TIMEFRAME_DAYS[timeframe] * 86_400_000;
   return games.filter((g) => new Date(g.date).getTime() >= cutoffMs);
@@ -434,6 +445,7 @@ export function filterGamesByTimeframe(games: Game[], timeframe: Timeframe): Gam
 export function computeScrewedByPlayerBar(
   games: Game[]
 ): { player: string; screwed: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   const map = new Map<string, number>();
   for (const g of games) {
     const screwedBuckets = new Set<string>();
@@ -462,6 +474,7 @@ export function computeScrewedByPlayerBar(
 export function computeScrewedByDeckPie(
   games: Game[]
 ): { deck: string; screwed: number }[] {
+  games = games.filter((g) => isCommanderFormat(g.variant));
   const nonImported = games.filter((g) => !g.isImported);
   const map = new Map<string, number>();
   for (const g of nonImported) {

@@ -17,6 +17,8 @@ function mkGame(over: Partial<GameForNotify>): GameForNotify {
   return {
     variant: 'COMMANDER',
     wonByCombo: false,
+    bestOf: null,
+    comboWins: null,
     participants: [],
     ...over,
   };
@@ -153,6 +155,171 @@ describe('buildNotifyMessage — KING Assassins', () => {
     });
     expect(buildNotifyMessage(g, ORIGIN)).toBe(
       'New King Commander game added! Assassins won — Carol (Kaalia), Dan (Voja), Eve (Atraxa) — without any combos. Check it out at http://localhost:3000/games'
+    );
+  });
+});
+
+describe('buildNotifyMessage — BRAWL', () => {
+  it('produces a Commander-shape line labeled "Brawl" with combo text', () => {
+    const g = mkGame({
+      variant: 'BRAWL',
+      wonByCombo: true,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true, deckName: 'Atraxa' }),
+        mkP({ playerName: 'Bob', deckName: 'Mono-Red' }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      'New Brawl game added! Alice won using Atraxa via combo. Check it out at http://localhost:3000/games'
+    );
+  });
+
+  it('shows "without any combos" when wonByCombo is false', () => {
+    const g = mkGame({
+      variant: 'BRAWL',
+      wonByCombo: false,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true, deckName: 'Atraxa' }),
+        mkP({ playerName: 'Bob', deckName: 'Burn' }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      'New Brawl game added! Alice won using Atraxa without any combos. Check it out at http://localhost:3000/games'
+    );
+  });
+
+  it('falls back to NO_DECK_FALLBACK when winner has no deck', () => {
+    const g = mkGame({
+      variant: 'BRAWL',
+      wonByCombo: false,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true }),
+        mkP({ playerName: 'Bob' }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      'New Brawl game added! Alice won using a deck they forgot to list without any combos. Check it out at http://localhost:3000/games'
+    );
+  });
+});
+
+describe.each([
+  { variant: 'STANDARD', label: 'Standard' },
+  { variant: 'PAUPER', label: 'Pauper' },
+  { variant: 'DRAFT', label: 'Draft' },
+  { variant: 'PRERELEASE', label: 'Prerelease' },
+  { variant: 'SEALED', label: 'Sealed' },
+  { variant: 'CUBE', label: 'Cube' },
+] as const)('buildNotifyMessage — best-of variant %p', ({ variant, label }) => {
+  it('Bo1 with comboWins 0 → "without any combos", no parenthetical', () => {
+    const g = mkGame({
+      variant,
+      wonByCombo: false,
+      bestOf: 1,
+      comboWins: 0,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true, deckName: 'Boros' }),
+        mkP({ playerName: 'Bob', isRandom: true }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      `New ${label} game added! Alice won using Boros without any combos. Check it out at http://localhost:3000/games`
+    );
+  });
+
+  it('Bo1 with comboWins 1 → "via combo", no parenthetical', () => {
+    const g = mkGame({
+      variant,
+      wonByCombo: true,
+      bestOf: 1,
+      comboWins: 1,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true, deckName: 'Boros' }),
+        mkP({ playerName: 'Bob', isRandom: true }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      `New ${label} game added! Alice won using Boros via combo. Check it out at http://localhost:3000/games`
+    );
+  });
+
+  it('Bo3 with comboWins 0 → "without combos", includes (Bo3)', () => {
+    const g = mkGame({
+      variant,
+      wonByCombo: false,
+      bestOf: 3,
+      comboWins: 0,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true, deckName: 'Boros' }),
+        mkP({ playerName: 'Bob', isRandom: true }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      `New ${label} (Bo3) game added! Alice won using Boros without combos. Check it out at http://localhost:3000/games`
+    );
+  });
+
+  it('Bo3 with comboWins 1 → "winning 1 game with combos"', () => {
+    const g = mkGame({
+      variant,
+      wonByCombo: true,
+      bestOf: 3,
+      comboWins: 1,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true, deckName: 'Boros' }),
+        mkP({ playerName: 'Bob', isRandom: true }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      `New ${label} (Bo3) game added! Alice won using Boros winning 1 game with combos. Check it out at http://localhost:3000/games`
+    );
+  });
+
+  it('Bo3 with comboWins 2 → "winning 2 games with combos"', () => {
+    const g = mkGame({
+      variant,
+      wonByCombo: true,
+      bestOf: 3,
+      comboWins: 2,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true, deckName: 'Boros' }),
+        mkP({ playerName: 'Bob', isRandom: true }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      `New ${label} (Bo3) game added! Alice won using Boros winning 2 games with combos. Check it out at http://localhost:3000/games`
+    );
+  });
+
+  it('Bo5 with comboWins 3 → "winning 3 games with combos"', () => {
+    const g = mkGame({
+      variant,
+      wonByCombo: true,
+      bestOf: 5,
+      comboWins: 3,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true, deckName: 'Boros' }),
+        mkP({ playerName: 'Bob', isRandom: true }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      `New ${label} (Bo5) game added! Alice won using Boros winning 3 games with combos. Check it out at http://localhost:3000/games`
+    );
+  });
+
+  it('falls back to NO_DECK_FALLBACK when winner has no deck (Bo3)', () => {
+    const g = mkGame({
+      variant,
+      wonByCombo: false,
+      bestOf: 3,
+      comboWins: 0,
+      participants: [
+        mkP({ playerName: 'Alice', isWinner: true }),
+        mkP({ playerName: 'Bob', isRandom: true }),
+      ],
+    });
+    expect(buildNotifyMessage(g, ORIGIN)).toBe(
+      `New ${label} (Bo3) game added! Alice won using a deck they forgot to list without combos. Check it out at http://localhost:3000/games`
     );
   });
 });

@@ -17,11 +17,11 @@ export async function POST(request: Request) {
   }
   try {
     const body = await request.json();
-    const { date, wonByCombo, notes, variant, participants } =
+    const { date, wonByCombo, notes, variant, bestOf, comboWins, participants } =
       gameCreateSchema.parse(body);
     const game = await prisma.$transaction(async (tx) => {
       const created = await tx.game.create({
-        data: { date, wonByCombo, notes, variant },
+        data: { date, wonByCombo, notes, variant, bestOf, comboWins },
       });
       await tx.gameParticipant.createMany({
         data: participants.map((p) => ({

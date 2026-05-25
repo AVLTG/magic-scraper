@@ -38,6 +38,8 @@ export async function POST(
       {
         variant: game.variant,
         wonByCombo: game.wonByCombo,
+        bestOf: game.bestOf,
+        comboWins: game.comboWins,
         participants: game.participants.map((p) => ({
           playerName: p.playerName,
           isWinner: p.isWinner,

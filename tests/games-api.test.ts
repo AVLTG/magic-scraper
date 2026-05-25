@@ -405,6 +405,73 @@ describe('POST /api/games', () => {
     expect(connys).toHaveLength(2);
     expect(connys.every((r: any) => r.isRandom === true)).toBe(true);
   });
+
+  it('persists bestOf and comboWins for a Bo3 STANDARD game', async () => {
+    mockGameCreate.mockResolvedValue({
+      id: 'g-bo3-1',
+      date: new Date('2026-05-24T00:00:00.000Z'),
+      wonByCombo: true,
+      bestOf: 3,
+      comboWins: 2,
+      variant: 'STANDARD',
+      createdAt: new Date(),
+    });
+    mockParticipantCreateMany.mockResolvedValue({ count: 2 });
+
+    const body = {
+      date: '2026-05-24T00:00:00.000Z',
+      variant: 'STANDARD',
+      bestOf: 3,
+      comboWins: 2,
+      wonByCombo: true,
+      participants: [
+        { playerName: 'Alice', isWinner: true, isScrewed: false, isRandom: false, deckName: 'Burn' },
+        { playerName: 'Bob', isWinner: false, isScrewed: false, isRandom: true },
+      ],
+    };
+
+    const res: any = await POST(makeRequest(body));
+
+    expect(res.status).toBe(201);
+    const createCall = mockGameCreate.mock.calls[0][0];
+    expect(createCall.data).toMatchObject({
+      variant: 'STANDARD',
+      bestOf: 3,
+      comboWins: 2,
+    });
+  });
+
+  it('persists bestOf=null/comboWins=null for COMMANDER', async () => {
+    mockGameCreate.mockResolvedValue({
+      id: 'g-cmd-1',
+      date: new Date('2026-05-24T00:00:00.000Z'),
+      wonByCombo: false,
+      bestOf: null,
+      comboWins: null,
+      variant: 'COMMANDER',
+      createdAt: new Date(),
+    });
+    mockParticipantCreateMany.mockResolvedValue({ count: 4 });
+
+    const body = {
+      date: '2026-05-24T00:00:00.000Z',
+      variant: 'COMMANDER',
+      wonByCombo: false,
+      participants: [
+        { playerName: 'A', isWinner: true, isScrewed: false, isRandom: false },
+        { playerName: 'B', isWinner: false, isScrewed: false, isRandom: false },
+        { playerName: 'C', isWinner: false, isScrewed: false, isRandom: false },
+        { playerName: 'D', isWinner: false, isScrewed: false, isRandom: false },
+      ],
+    };
+
+    const res: any = await POST(makeRequest(body));
+
+    expect(res.status).toBe(201);
+    const createCall = mockGameCreate.mock.calls[0][0];
+    expect(createCall.data.bestOf).toBeNull();
+    expect(createCall.data.comboWins).toBeNull();
+  });
 });
 
 describe('GET /api/games', () => {

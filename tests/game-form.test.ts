@@ -2,6 +2,7 @@ import {
   excludeItemsForRow,
   validateGameForm,
   buildInitialState,
+  initialRows,
 } from '../src/app/games/game-form';
 import type {
   GameFormState,
@@ -25,8 +26,10 @@ function baseState(
     roles: (ParticipantRole | null)[];
     winningTeam: 'ROYALTY' | 'ASSASSINS' | null;
     variant: GameVariant;
+    bestOf: number | null;
+    comboWins: number | null;
   }> = {}
-) {
+): GameFormState {
   return {
     date: '2026-04-10',
     notes: '',
@@ -37,6 +40,8 @@ function baseState(
     roles: rows.map(() => null) as (ParticipantRole | null)[],
     winningTeam: null as 'ROYALTY' | 'ASSASSINS' | null,
     variant: 'COMMANDER' as GameVariant,
+    bestOf: null,
+    comboWins: null,
     ...overrides,
   };
 }
@@ -230,6 +235,8 @@ function baseStateV(
     roles: rows.map(() => null) as (ParticipantRole | null)[],
     winningTeam: null,
     variant,
+    bestOf: null,
+    comboWins: null,
     ...extras,
   };
 }
@@ -459,5 +466,131 @@ describe('buildInitialState — isRandom hydration', () => {
     };
     const state = buildInitialState(game);
     expect(state.rows[0].isRandom).toBe(false);
+  });
+});
+
+describe('initialRows — Random default for non-COMMANDER 2-player variants (D-38)', () => {
+  it.each(['BRAWL', 'STANDARD', 'PAUPER', 'DRAFT', 'PRERELEASE', 'SEALED', 'CUBE'] as const)(
+    'auto-checks isRandom on row 2 for variant %s',
+    (variant) => {
+      const rows = initialRows(2, variant);
+      expect(rows).toHaveLength(2);
+      expect(rows[0].isRandom).toBe(false);
+      expect(rows[1].isRandom).toBe(true);
+    }
+  );
+
+  it('does NOT auto-check isRandom for 2-player COMMANDER', () => {
+    const rows = initialRows(2, 'COMMANDER');
+    expect(rows[0].isRandom).toBe(false);
+    expect(rows[1].isRandom).toBe(false);
+  });
+
+  it('does NOT auto-check Random for 3-player+ variants', () => {
+    const rows = initialRows(4, 'COMMANDER');
+    expect(rows.every((r) => r.isRandom === false)).toBe(true);
+  });
+
+  it('returns the requested number of rows', () => {
+    expect(initialRows(5, 'STAR')).toHaveLength(5);
+    expect(initialRows(8, 'KING')).toHaveLength(8);
+  });
+});
+
+describe('validateGameForm — bestOf/comboWins (D-34, D-36, D-39)', () => {
+  function bestOfBaseState(over: Partial<GameFormState> = {}): GameFormState {
+    return {
+      date: '2026-05-24',
+      notes: '',
+      wonByCombo: false,
+      rows: [
+        { playerName: 'Alice', deckName: 'Burn', isWinner: true, isScrewed: false, isRandom: false },
+        { playerName: 'Bob',   deckName: 'UB',   isWinner: false, isScrewed: false, isRandom: false },
+      ],
+      winnerIndex: 0,
+      winnerIndices: [0],
+      roles: [null, null],
+      winningTeam: null,
+      variant: 'STANDARD',
+      bestOf: 3,
+      comboWins: 1,
+      ...over,
+    };
+  }
+
+  it('accepts a valid STANDARD Bo3 with comboWins 1', () => {
+    const res = validateGameForm(bestOfBaseState());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.payload.variant).toBe('STANDARD');
+      expect(res.payload.bestOf).toBe(3);
+      expect(res.payload.comboWins).toBe(1);
+    }
+  });
+
+  it('rejects comboWins greater than ceil(bestOf/2)', () => {
+    const res = validateGameForm(bestOfBaseState({ bestOf: 3, comboWins: 3 }));
+    expect(res.ok).toBe(false);
+  });
+
+  it('derives wonByCombo=true from comboWins > 0', () => {
+    const res = validateGameForm(bestOfBaseState({ bestOf: 3, comboWins: 2, wonByCombo: false }));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.payload.wonByCombo).toBe(true);
+  });
+
+  it('derives wonByCombo=false from comboWins === 0', () => {
+    const res = validateGameForm(bestOfBaseState({ bestOf: 3, comboWins: 0, wonByCombo: true }));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.payload.wonByCombo).toBe(false);
+  });
+
+  it('requires bestOf for best-of variants', () => {
+    const res = validateGameForm(bestOfBaseState({ bestOf: null, comboWins: null }));
+    expect(res.ok).toBe(false);
+  });
+
+  it('forbids bestOf for COMMANDER', () => {
+    const res = validateGameForm(
+      bestOfBaseState({
+        variant: 'COMMANDER',
+        bestOf: 3,
+        comboWins: 0,
+        rows: [
+          { playerName: 'A', deckName: '', isWinner: true,  isScrewed: false, isRandom: false },
+          { playerName: 'B', deckName: '', isWinner: false, isScrewed: false, isRandom: false },
+          { playerName: 'C', deckName: '', isWinner: false, isScrewed: false, isRandom: false },
+          { playerName: 'D', deckName: '', isWinner: false, isScrewed: false, isRandom: false },
+        ],
+        winnerIndex: 0,
+        winnerIndices: [],
+      })
+    );
+    expect(res.ok).toBe(false);
+  });
+
+  it('best-of payload null-fills bestOf/comboWins for non-best-of variant', () => {
+    // Ensure that when variant is COMMANDER and the form mistakenly carries
+    // stale bestOf/comboWins, the validator rejects rather than silently emitting them.
+    const res = validateGameForm(
+      bestOfBaseState({
+        variant: 'COMMANDER',
+        bestOf: null,
+        comboWins: null,
+        rows: [
+          { playerName: 'A', deckName: '', isWinner: true,  isScrewed: false, isRandom: false },
+          { playerName: 'B', deckName: '', isWinner: false, isScrewed: false, isRandom: false },
+          { playerName: 'C', deckName: '', isWinner: false, isScrewed: false, isRandom: false },
+          { playerName: 'D', deckName: '', isWinner: false, isScrewed: false, isRandom: false },
+        ],
+        winnerIndex: 0,
+        winnerIndices: [],
+      })
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.payload.bestOf).toBeNull();
+      expect(res.payload.comboWins).toBeNull();
+    }
   });
 });

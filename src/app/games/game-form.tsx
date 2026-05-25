@@ -2,6 +2,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Combobox } from '@/app/components/combobox';
 import type { GameVariant, ParticipantRole } from '@/lib/validators';
+import { BEST_OF_FORMATS, maxComboWinsFor, isSingleWinnerVariant } from '@/lib/gameFormats';
 
 export type { GameVariant, ParticipantRole };
 
@@ -25,6 +26,8 @@ export interface GameFormState {
   roles: (ParticipantRole | null)[];      // KING only — index-aligned with rows
   winningTeam: WinningTeam | null;        // KING only
   variant: GameVariant;
+  bestOf: number | null;
+  comboWins: number | null;
 }
 
 export interface GameFormPayload {
@@ -32,6 +35,8 @@ export interface GameFormPayload {
   wonByCombo: boolean;
   notes?: string;
   variant?: GameVariant;
+  bestOf?: number | null;
+  comboWins?: number | null;
   participants: {
     playerName: string;
     isWinner: boolean;
@@ -95,6 +100,8 @@ export function validateGameForm(state: GameFormState): ValidationResult {
   });
   if (Object.keys(rowErrors).length > 0) errors.rows = rowErrors;
 
+  const isBestOf = BEST_OF_FORMATS.has(state.variant);
+
   if (!errors.form) {
     if (state.variant === 'COMMANDER') {
       if (state.winnerIndex < 0 || state.winnerIndex >= state.rows.length) {
@@ -104,7 +111,7 @@ export function validateGameForm(state: GameFormState): ValidationResult {
       if (state.winnerIndices.length < 1 || state.winnerIndices.length > 2) {
         errors.form = 'Star Commander games need 1 or 2 winners';
       }
-    } else {
+    } else if (state.variant === 'KING') {
       const kingCount = state.roles.filter((r) => r === 'KING').length;
       const unassigned = state.roles.some((r) => r == null);
       if (unassigned) {
@@ -113,6 +120,33 @@ export function validateGameForm(state: GameFormState): ValidationResult {
         errors.form = 'King Commander games need exactly one King';
       } else if (state.winningTeam == null) {
         errors.form = 'Pick the winning team (Royalty or Assassins)';
+      }
+    } else if (state.variant === 'BRAWL' || isBestOf) {
+      // Both BRAWL and best-of variants are heads-up: exactly one winner among 2 rows.
+      if (state.winnerIndex < 0 || state.winnerIndex >= state.rows.length) {
+        errors.form = 'Exactly one winner required';
+      }
+    }
+  }
+
+  // Best-of-specific bestOf/comboWins constraints
+  if (!errors.form) {
+    if (isBestOf) {
+      if (state.bestOf !== 1 && state.bestOf !== 3 && state.bestOf !== 5) {
+        errors.form = 'Best-of must be 1, 3, or 5';
+      } else {
+        const max = maxComboWinsFor(state.bestOf);
+        if (
+          state.comboWins == null ||
+          state.comboWins < 0 ||
+          state.comboWins > max
+        ) {
+          errors.form = `Combo wins must be between 0 and ${max}`;
+        }
+      }
+    } else {
+      if (state.bestOf != null || state.comboWins != null) {
+        errors.form = `${state.variant} games must not set bestOf/comboWins`;
       }
     }
   }
@@ -125,11 +159,12 @@ export function validateGameForm(state: GameFormState): ValidationResult {
     let isWinner = false;
     let role: ParticipantRole | undefined;
 
-    if (state.variant === 'COMMANDER') {
+    if (isSingleWinnerVariant(state.variant)) {
       isWinner = i === state.winnerIndex;
     } else if (state.variant === 'STAR') {
       isWinner = state.winnerIndices.includes(i);
     } else {
+      // KING
       role = state.roles[i] as ParticipantRole;
       if (state.winningTeam === 'ROYALTY') {
         isWinner = role === 'KING' || role === 'SQUIRE';
@@ -148,13 +183,17 @@ export function validateGameForm(state: GameFormState): ValidationResult {
     };
   });
 
+  const wonByCombo = isBestOf ? (state.comboWins ?? 0) > 0 : state.wonByCombo;
+
   return {
     ok: true,
     payload: {
       date: new Date(state.date).toISOString(),
-      wonByCombo: state.wonByCombo,
+      wonByCombo,
       notes: state.notes.trim() === '' ? undefined : state.notes.trim(),
       variant: state.variant,
+      bestOf: isBestOf ? state.bestOf : null,
+      comboWins: isBestOf ? state.comboWins : null,
       participants,
     },
   };
@@ -164,12 +203,28 @@ function emptyRow(): ParticipantRow {
   return { playerName: '', deckName: '', isWinner: false, isScrewed: false, isRandom: false };
 }
 
+/**
+ * Phase 6.2 D-38: For 2-player non-COMMANDER variants (BRAWL + best-of formats),
+ * the second player is typically a Random opponent (Arena / shop matchup), so
+ * auto-check `isRandom` on row 2. COMMANDER 2-player and any 3-player+ game
+ * leaves all rows un-checked.
+ */
+export function initialRows(playerCount: number, variant: GameVariant): ParticipantRow[] {
+  const rows = Array.from({ length: playerCount }, emptyRow);
+  if (playerCount === 2 && variant !== 'COMMANDER') {
+    rows[1] = { ...rows[1], isRandom: true };
+  }
+  return rows;
+}
+
 /** Build a GameFormState from an API game response (for edit-mode pre-population). */
 export function buildInitialState(game: {
   date: string | Date;
   wonByCombo: boolean;
   notes: string | null;
   variant?: GameVariant;
+  bestOf?: number | null;
+  comboWins?: number | null;
   participants: {
     playerName: string;
     isWinner: boolean;
@@ -222,12 +277,15 @@ export function buildInitialState(game: {
     roles,
     winningTeam,
     variant,
+    bestOf: game.bestOf ?? null,
+    comboWins: game.comboWins ?? null,
   };
 }
 
 export interface GameFormProps {
   playerCount: number;
   variant?: GameVariant;
+  bestOf?: number | null;
   initial?: GameFormState;
   submitLabel?: string;
   onSubmit: (payload: GameFormPayload) => Promise<void> | void;
@@ -236,6 +294,7 @@ export interface GameFormProps {
 export function GameForm({
   playerCount,
   variant = 'COMMANDER',
+  bestOf,
   initial,
   submitLabel = 'Save game',
   onSubmit,
@@ -249,12 +308,14 @@ export function GameForm({
       date: new Date().toLocaleDateString('en-CA'),
       notes: '',
       wonByCombo: false,
-      rows: Array.from({ length: playerCount }, emptyRow),
+      rows: initialRows(playerCount, variant),
       winnerIndex: -1,
       winnerIndices: [],
       roles: Array.from({ length: playerCount }, () => null) as (ParticipantRole | null)[],
       winningTeam: null,
       variant,
+      bestOf: bestOf ?? null,
+      comboWins: bestOf != null ? 0 : null,
     }
   );
   const [playerItems, setPlayerItems] = useState<string[]>([]);
@@ -339,14 +400,52 @@ export function GameForm({
           />
           {errors.date && <p className="text-xs text-red-600 mt-1">{errors.date}</p>}
         </div>
-        <label className="flex items-center gap-2 pb-2 shrink-0">
-          <input
-            type="checkbox"
-            checked={state.wonByCombo}
-            onChange={(e) => setState((s) => ({ ...s, wonByCombo: e.target.checked }))}
-          />
-          <span className="text-sm text-foreground"><span className="sm:hidden">Combo Win</span><span className="hidden sm:inline">Won by combo</span></span>
-        </label>
+        {(() => {
+          const isBestOf = BEST_OF_FORMATS.has(state.variant);
+          const showSelect = isBestOf && state.bestOf != null && state.bestOf > 1;
+          if (showSelect) {
+            const max = maxComboWinsFor(state.bestOf!);
+            return (
+              <label className="flex items-center gap-2 pb-2 shrink-0">
+                <span className="text-sm text-foreground">Combo wins</span>
+                <select
+                  value={state.comboWins ?? 0}
+                  onChange={(e) =>
+                    setState((s) => ({ ...s, comboWins: Number(e.target.value) }))
+                  }
+                  className="px-2 py-1 rounded-md border border-border bg-surface text-foreground text-sm"
+                  aria-label="Combo wins"
+                >
+                  {Array.from({ length: max + 1 }, (_, n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+            );
+          }
+          // Bo1 OR non-best-of → checkbox
+          const checked = isBestOf ? (state.comboWins ?? 0) > 0 : state.wonByCombo;
+          const onChange = (next: boolean) => {
+            if (isBestOf) {
+              setState((s) => ({ ...s, comboWins: next ? 1 : 0, wonByCombo: next }));
+            } else {
+              setState((s) => ({ ...s, wonByCombo: next }));
+            }
+          };
+          return (
+            <label className="flex items-center gap-2 pb-2 shrink-0">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => onChange(e.target.checked)}
+              />
+              <span className="text-sm text-foreground">
+                <span className="sm:hidden">Combo Win</span>
+                <span className="hidden sm:inline">Won by combo</span>
+              </span>
+            </label>
+          );
+        })()}
       </div>
 
       <div>
@@ -414,7 +513,7 @@ export function GameForm({
               placeholder="Deck (optional)"
               addLabel="deck"
             />
-            {state.variant === 'COMMANDER' && (
+            {isSingleWinnerVariant(state.variant) && (
               <label className="flex items-center gap-1 text-xs text-muted">
                 <input
                   type="radio"

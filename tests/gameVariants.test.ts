@@ -30,3 +30,23 @@ describe('getVariantBadge', () => {
     expect(() => getVariantBadge('definitely-unknown')).not.toThrow();
   });
 });
+
+describe('getVariantBadge — new variants', () => {
+  it.each([
+    ['BRAWL', 'Brawl'],
+    ['STANDARD', 'Standard'],
+    ['PAUPER', 'Pauper'],
+    ['DRAFT', 'Draft'],
+    ['PRERELEASE', 'Prerelease'],
+    ['SEALED', 'Sealed'],
+    ['CUBE', 'Cube'],
+  ])('returns label %s for variant %s', (variant, expectedLabel) => {
+    expect(getVariantBadge(variant).label).toBe(expectedLabel);
+  });
+
+  it('returns a non-empty class string for every new variant', () => {
+    for (const v of ['BRAWL', 'STANDARD', 'PAUPER', 'DRAFT', 'PRERELEASE', 'SEALED', 'CUBE']) {
+      expect(getVariantBadge(v).classes.length).toBeGreaterThan(0);
+    }
+  });
+});

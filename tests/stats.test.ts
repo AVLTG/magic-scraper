@@ -55,6 +55,8 @@ function mkGame(
     date: new Date(date + 'T00:00:00Z').toISOString(),
     wonByCombo: opts.wonByCombo ?? false,
     variant: opts.variant ?? 'COMMANDER',
+    bestOf: null,
+    comboWins: null,
     isImported: opts.isImported ?? false,
     notes: null,
     createdAt: new Date().toISOString(),
@@ -928,5 +930,59 @@ describe('deck-skip: computeDeckWinRate', () => {
     const result = computeDeckWinRate(games);
     expect(result.find((d) => d.deck === 'Atraxa')?.played).toBe(1);
     expect(result.find((d) => d.deck === 'Selvala')).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D-32/D-43: silent Commander-format gate
+// ---------------------------------------------------------------------------
+
+describe('stats — silent Commander-format gate', () => {
+  it('excludes STANDARD games from computePlayerWinRate', () => {
+    const cmd = mkGame('2026-05-01', [
+      mkParticipant('Alice', { isWinner: true }),
+      mkParticipant('Bob'),
+    ]);
+    const std = mkGame('2026-05-02', [
+      mkParticipant('Alice'),
+      mkParticipant('Bob', { isWinner: true }),
+    ], { variant: 'STANDARD' });
+    const rates = computePlayerWinRate([cmd, std]);
+    const alice = rates.find((r) => r.player === 'Alice');
+    expect(alice).toBeDefined();
+    expect(alice?.wins).toBe(1);
+    expect(alice?.played).toBe(1); // STANDARD game excluded
+  });
+
+  it('INCLUDES BRAWL games in computePlayerWinRate (BRAWL is a Commander format)', () => {
+    const brawl = mkGame('2026-05-01', [
+      mkParticipant('Alice', { isWinner: true }),
+      mkParticipant('Bob'),
+    ], { variant: 'BRAWL' });
+    const rates = computePlayerWinRate([brawl]);
+    expect(rates.find((r) => r.player === 'Alice')?.wins).toBe(1);
+  });
+
+  it('excludes non-Commander variants from computeDeckWinRate', () => {
+    const cmd = mkGame('2026-05-01', [
+      mkParticipant('A', { isWinner: true, deckName: 'Atraxa' }),
+      mkParticipant('B', { deckName: 'Burn' }),
+    ]);
+    const draft = mkGame('2026-05-02', [
+      mkParticipant('C', { isWinner: true, deckName: 'Boros' }),
+      mkParticipant('D', { deckName: 'UB' }),
+    ], { variant: 'DRAFT' });
+    const rates = computeDeckWinRate([cmd, draft]);
+    expect(rates.find((r) => r.deck === 'Boros')).toBeUndefined();
+    expect(rates.find((r) => r.deck === 'Atraxa')?.wins).toBe(1);
+  });
+
+  it('excludes non-Commander variants from computeScrewedRate', () => {
+    const pauper = mkGame('2026-05-01', [
+      mkParticipant('A', { isWinner: true, isScrewed: true }),
+      mkParticipant('B'),
+    ], { variant: 'PAUPER' });
+    const rates = computeScrewedRate([pauper]);
+    expect(rates.find((r) => r.player === 'A')).toBeUndefined();
   });
 });

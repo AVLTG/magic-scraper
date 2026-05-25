@@ -40,16 +40,18 @@ model CollectionCard {
 }
 
 model Game {
-  id           String              @id @default(cuid())
-  date         DateTime
-  wonByCombo   Boolean             @default(false)
-  notes        String?
-  isImported        Boolean             @default(false)
-  discordNotified   Boolean             @default(false)
-  variant           String              @default("COMMANDER")
-  createdAt         DateTime            @default(now())
+  id              String              @id @default(cuid())
+  date            DateTime
+  wonByCombo      Boolean             @default(false)
+  notes           String?
+  isImported      Boolean             @default(false)
+  discordNotified Boolean             @default(false)
+  variant         String              @default("COMMANDER")
+  bestOf          Int?
+  comboWins       Int?
+  createdAt       DateTime            @default(now())
 
-  participants GameParticipant[]
+  participants    GameParticipant[]
 
   @@index([date])
   @@map("games")

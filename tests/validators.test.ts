@@ -28,9 +28,6 @@ function p(
 }
 
 describe('GAME_VARIANTS / PARTICIPANT_ROLES constants', () => {
-  it('exports the expected variant values', () => {
-    expect(GAME_VARIANTS).toEqual(['COMMANDER', 'STAR', 'KING']);
-  });
   it('exports the expected role values', () => {
     expect(PARTICIPANT_ROLES).toEqual(['KING', 'SQUIRE', 'ASSASSIN']);
   });
@@ -316,6 +313,22 @@ describe('gameUpdateSchema — body has no variant; invariants deferred to route
     });
     expect(res.success).toBe(true);
   });
+
+  // D-45: bestOf / comboWins are creation-time only — gameUpdateSchema must strip them
+  // silently rather than accept them. Zod's default for omitted keys is strip.
+  it('strips bestOf and comboWins keys when present in the update body', () => {
+    const res = gameUpdateSchema.safeParse({
+      date: baseDate,
+      bestOf: 3,
+      comboWins: 2,
+      participants: [p('A', { isWinner: true }), p('B')],
+    });
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect('bestOf' in res.data).toBe(false);
+      expect('comboWins' in res.data).toBe(false);
+    }
+  });
 });
 
 describe('gameCreateSchema — isRandom field', () => {
@@ -387,4 +400,287 @@ describe('gameCreateSchema — isRandom field', () => {
     });
     expect(res.success).toBe(false);
   });
+});
+
+// ===========================================================================
+// New variants: BRAWL + best-of formats
+// ===========================================================================
+
+describe('GAME_VARIANTS — expanded to 10 entries', () => {
+  it('lists every variant in the canonical order from gameFormats.ts', () => {
+    expect(GAME_VARIANTS).toEqual([
+      'COMMANDER', 'STAR', 'KING', 'BRAWL',
+      'STANDARD', 'PAUPER', 'DRAFT', 'PRERELEASE', 'SEALED', 'CUBE',
+    ]);
+  });
+});
+
+describe('gameCreateSchema — BRAWL', () => {
+  it('accepts a 2-player BRAWL game with one winner and no bestOf/comboWins', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      variant: 'BRAWL',
+      participants: [p('A', { isWinner: true }), p('B')],
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('rejects BRAWL with 3 participants', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      variant: 'BRAWL',
+      participants: [p('A', { isWinner: true }), p('B'), p('C')],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('rejects BRAWL with zero winners', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      variant: 'BRAWL',
+      participants: [p('A'), p('B')],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('rejects BRAWL with bestOf set', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      variant: 'BRAWL',
+      bestOf: 3,
+      participants: [p('A', { isWinner: true }), p('B')],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('rejects BRAWL with comboWins set', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      variant: 'BRAWL',
+      comboWins: 1,
+      participants: [p('A', { isWinner: true }), p('B')],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('rejects BRAWL participants with roles', () => {
+    const res = gameCreateSchema.safeParse({
+      date: baseDate,
+      variant: 'BRAWL',
+      participants: [p('A', { isWinner: true, role: 'KING' }), p('B')],
+    });
+    expect(res.success).toBe(false);
+  });
+});
+
+describe.each(['STANDARD', 'PAUPER', 'DRAFT', 'PRERELEASE', 'SEALED', 'CUBE'] as const)(
+  'gameCreateSchema — best-of variant %s',
+  (variant) => {
+    it('accepts Bo1 with comboWins 0', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 1,
+        comboWins: 0,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(true);
+    });
+
+    it('accepts Bo1 with comboWins 1', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 1,
+        comboWins: 1,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(true);
+    });
+
+    it('accepts Bo3 with comboWins 0, 1, and 2', () => {
+      for (const comboWins of [0, 1, 2]) {
+        const res = gameCreateSchema.safeParse({
+          date: baseDate,
+          variant,
+          bestOf: 3,
+          comboWins,
+          participants: [p('A', { isWinner: true }), p('B')],
+        });
+        expect(res.success).toBe(true);
+      }
+    });
+
+    it('accepts Bo5 with comboWins 0, 1, 2, and 3', () => {
+      for (const comboWins of [0, 1, 2, 3]) {
+        const res = gameCreateSchema.safeParse({
+          date: baseDate,
+          variant,
+          bestOf: 5,
+          comboWins,
+          participants: [p('A', { isWinner: true }), p('B')],
+        });
+        expect(res.success).toBe(true);
+      }
+    });
+
+    it('rejects bestOf 2', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 2,
+        comboWins: 0,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects bestOf 4', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 4,
+        comboWins: 0,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects missing bestOf', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        comboWins: 0,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects missing comboWins', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects Bo3 with comboWins 3', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        comboWins: 3,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects Bo5 with comboWins 4', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 5,
+        comboWins: 4,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects negative comboWins', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        comboWins: -1,
+        participants: [p('A', { isWinner: true }), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects 1 participant', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        comboWins: 0,
+        participants: [p('A', { isWinner: true })],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects 3 participants', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        comboWins: 0,
+        participants: [p('A', { isWinner: true }), p('B'), p('C')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects zero winners', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        comboWins: 0,
+        participants: [p('A'), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects two winners', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        comboWins: 0,
+        participants: [p('A', { isWinner: true }), p('B', { isWinner: true })],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects role on participants', () => {
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        comboWins: 0,
+        participants: [p('A', { isWinner: true, role: 'KING' }), p('B')],
+      });
+      expect(res.success).toBe(false);
+    });
+  }
+);
+
+describe('gameCreateSchema — non-best-of variants reject bestOf/comboWins', () => {
+  it.each(['COMMANDER', 'STAR', 'KING'] as const)(
+    '%s rejects bestOf when set',
+    (variant) => {
+      const participants =
+        variant === 'STAR'
+          ? [p('A', { isWinner: true }), p('B'), p('C'), p('D'), p('E')]
+          : variant === 'KING'
+          ? [
+              p('A', { isWinner: true, role: 'KING' }),
+              p('B', { isWinner: true, role: 'SQUIRE' }),
+              p('C', { isWinner: true, role: 'SQUIRE' }),
+              p('D', { role: 'ASSASSIN' }),
+              p('E', { role: 'ASSASSIN' }),
+              p('F', { role: 'ASSASSIN' }),
+            ]
+          : [p('A', { isWinner: true }), p('B'), p('C'), p('D')];
+
+      const res = gameCreateSchema.safeParse({
+        date: baseDate,
+        variant,
+        bestOf: 3,
+        participants,
+      });
+      expect(res.success).toBe(false);
+    }
+  );
 });

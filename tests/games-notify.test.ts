@@ -64,6 +64,8 @@ const baseGame = {
   isImported: false,
   discordNotified: false,
   variant: 'COMMANDER',
+  bestOf: null,
+  comboWins: null,
   createdAt: new Date(),
   participants: [
     {
@@ -233,6 +235,48 @@ describe('POST /api/games/[id]/notify', () => {
       content:
         'New King Commander game added! Royalty won — Zelda (King, Atraxa), Bob (Squire, Edric), Carol (Squire, Kaalia) — without any combos. Check it out at http://localhost:3000/games',
     });
+  });
+
+  it('builds Bo3 STANDARD message from stored bestOf/comboWins', async () => {
+    mockCheckRateLimit.mockReturnValueOnce({ allowed: true });
+    mockGameFindUnique.mockResolvedValueOnce({
+      ...baseGame,
+      id: 'g-bo3',
+      variant: 'STANDARD',
+      wonByCombo: true,
+      bestOf: 3,
+      comboWins: 2,
+      participants: [
+        {
+          id: 'p-a',
+          gameId: 'g-bo3',
+          playerName: 'Alice',
+          isWinner: true,
+          isScrewed: false,
+          isRandom: false,
+          deckName: 'Burn',
+          role: null,
+        },
+        {
+          id: 'p-b',
+          gameId: 'g-bo3',
+          playerName: 'Bob',
+          isWinner: false,
+          isScrewed: false,
+          isRandom: true,
+          deckName: null,
+          role: null,
+        },
+      ],
+    });
+    mockGameUpdate.mockResolvedValueOnce({});
+    mockSendDiscordAlert.mockResolvedValueOnce(undefined);
+
+    await POST(makeRequest(), makeParams('g-bo3'));
+
+    const content = (mockSendDiscordAlert.mock.calls[0][0] as { content: string }).content;
+    expect(content).toContain('New Standard (Bo3) game added!');
+    expect(content).toContain('Alice won using Burn winning 2 games with combos.');
   });
 
   it('sends KING Assassins message in alphabetical order', async () => {
