@@ -1,0 +1,14 @@
+# Normalize line endings: store LF in the repo, check out LF everywhere.
+# Prevents the working-tree CRLF drift that this repo accumulated.
+* text=auto eol=lf
+
+# Treat known binaries as binary (never line-ending-normalized).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.db binary

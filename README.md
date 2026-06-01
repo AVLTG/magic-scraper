@@ -1,4 +1,4 @@
-# Magic Collection Checker
+# TableTally
 
 A web application that allows you to check which cards from your Magic: The Gathering decklist are available in your friends' collections. The app scrapes Moxfield collections and provides an easy-to-use interface for deck checking.
 
@@ -29,8 +29,8 @@ A web application that allows you to check which cards from your Magic: The Gath
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/madelahn/magic-scraper.git
-cd magic-scraper
+git clone https://github.com/AVLTG/tabletally.git
+cd tabletally
 ```
 
 ### 2. Install Dependencies
@@ -184,8 +184,8 @@ npm -v
 
 ```bash
 cd ~
-git clone https://github.com/madelahn/magic-scraper.git
-cd magic-scraper
+git clone https://github.com/AVLTG/tabletally.git
+cd tabletally
 
 # Install dependencies
 npm install
@@ -210,7 +210,7 @@ npm run build
 sudo npm install -g pm2
 
 # Start the application
-pm2 start npm --name "magic-checker" -- start
+pm2 start npm --name "tabletally" -- start
 
 # Enable startup on boot
 pm2 startup
@@ -234,7 +234,7 @@ cloudflared tunnel login
 
 ```bash
 # Create tunnel
-cloudflared tunnel create magic-checker
+cloudflared tunnel create tabletally
 
 # Note the tunnel ID from the output
 
@@ -258,7 +258,7 @@ ingress:
 **Route tunnel to your domain:**
 
 ```bash
-cloudflared tunnel route dns magic-checker your-domain.com
+cloudflared tunnel route dns tabletally your-domain.com
 ```
 
 **Run tunnel as a service:**
@@ -291,7 +291,7 @@ Replace `your-cron-secret-here` with your `CRON_SECRET` from `.env`.
 
 ```bash
 pm2 status
-pm2 logs magic-checker
+pm2 logs tabletally
 ```
 
 **Check tunnel status:**
@@ -303,14 +303,14 @@ sudo systemctl status cloudflared
 **Check database:**
 
 ```bash
-cd ~/magic-scraper
+cd ~/tabletally
 npx prisma studio
 ```
 
 ## Project Structure
 
 ```
-magic-scraper/
+tabletally/
 ├── prisma/
 │   ├── schema.prisma          # Database schema
 │   └── dev.db                 # SQLite database (gitignored)

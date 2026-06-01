@@ -56,7 +56,7 @@ function LoginContent() {
 
         <div className="rounded-xl border border-border bg-surface p-8">
           <h1 className="text-xl font-bold font-narrow text-foreground mb-1">
-            MTGCardSearch
+            TableTally
           </h1>
           <p className="text-sm text-muted mb-6">
             Enter group password to continue

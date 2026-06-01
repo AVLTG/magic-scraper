@@ -1,6 +1,6 @@
-# Deployment Guide — magic-scraper
+# Deployment Guide — tabletally
 
-magic-scraper is an MTG collection checker for friend groups. It lets any member of the group instantly see who owns a given card and which local stores have it in stock. It runs on Next.js (deployed to Vercel) with a Turso (SQLite-compatible) database. Nightly collection syncs are driven by a Vercel Cron job that fetches each user's Moxfield collection automatically.
+tabletally is an MTG collection checker for friend groups. It lets any member of the group instantly see who owns a given card and which local stores have it in stock. It runs on Next.js (deployed to Vercel) with a Turso (SQLite-compatible) database. Nightly collection syncs are driven by a Vercel Cron job that fetches each user's Moxfield collection automatically.
 
 ---
 
@@ -41,7 +41,7 @@ magic-scraper is an MTG collection checker for friend groups. It lets any member
 ```bash
 # 1. Clone the repo
 git clone <repo-url>
-cd magic-scraper
+cd tabletally
 
 # 2. Install dependencies
 npm install
@@ -87,15 +87,15 @@ Visit `http://localhost:3000/login` and enter the group password to verify the a
 turso auth login
 
 # Create a new database (name it anything — used only for identification)
-turso db create magic-scraper
+turso db create tabletally
 
 # Get the database URL
-turso db show magic-scraper --url
-# Output: libsql://magic-scraper-<your-org>.turso.io
+turso db show tabletally --url
+# Output: libsql://tabletally-<your-org>.turso.io
 # Copy this — it becomes DATABASE_URL
 
 # Create an auth token (full-access token for the database)
-turso db tokens create magic-scraper
+turso db tokens create tabletally
 # Output: eyJhbGc...
 # Copy this — it becomes DATABASE_AUTH_TOKEN
 ```
@@ -122,7 +122,7 @@ Apply them to **Production** at minimum. Optionally also set them for Preview an
 
 | Variable | What it is | How to get it | Example |
 |---|---|---|---|
-| `DATABASE_URL` | Turso database URL | `turso db show <name> --url` | `libsql://magic-scraper-myorg.turso.io` |
+| `DATABASE_URL` | Turso database URL | `turso db show <name> --url` | `libsql://tabletally-myorg.turso.io` |
 | `DATABASE_AUTH_TOKEN` | Turso auth token (full access) | `turso db tokens create <name>` | `eyJhbGciOiJFZERTQSJ9...` |
 | `COOKIE_SECRET` | HMAC key for session cookies — must be 32+ bytes | `openssl rand -hex 32` | `a1b2c3d4...` (64 hex chars) |
 | `GROUP_PASSWORD` | Shared password all group members use to log in | Choose any string | `our-mtg-group-2024` |
@@ -150,7 +150,7 @@ Prisma generates the client during the Vercel build step (via `prisma generate` 
 Run this locally against your production Turso database:
 
 ```bash
-DATABASE_URL="libsql://magic-scraper-your-org.turso.io" \
+DATABASE_URL="libsql://tabletally-your-org.turso.io" \
 DATABASE_AUTH_TOKEN="eyJhbGc..." \
 npx prisma db push
 ```

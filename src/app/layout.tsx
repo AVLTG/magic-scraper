@@ -14,8 +14,8 @@ const archivoNarrow = Archivo_Narrow({
 });
 
 export const metadata: Metadata = {
-  title: "MTG Card Search",
-  description: "",
+  title: "TableTally",
+  description: "Your playgroup's hub for collections, decks, store stock, games, and stats.",
 };
 
 // Inline script to set theme before paint — prevents flash of wrong theme

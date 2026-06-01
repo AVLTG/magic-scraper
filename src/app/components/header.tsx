@@ -28,7 +28,7 @@ export default function Header() {
   return (
     <header className="flex py-6 justify-between items-center border-b border-border relative">
       <Link href="/" className="text-lg font-bold font-narrow tracking-tight text-foreground hover:text-accent transition-colors">
-        MTGCardSearch
+        TableTally
       </Link>
 
       {/* Desktop nav */}

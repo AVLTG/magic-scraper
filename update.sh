@@ -1,10 +1,10 @@
 #!/bin/bash
 
-echo "🔄 Updating Magic Collection Checker..."
+echo "🔄 Updating TableTally..."
 
 # Stop the application
 echo "⏸️  Stopping application..."
-pm2 stop magic-checker
+pm2 stop tabletally
 
 # Pull latest changes
 echo "📥 Pulling latest code..."
@@ -25,7 +25,7 @@ npm run build
 
 # Restart the application
 echo "▶️  Restarting application..."
-pm2 restart magic-checker
+pm2 restart tabletally
 
 echo "✅ Update complete!"
 pm2 status
