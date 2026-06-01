@@ -1,0 +1,17 @@
+# Never upload local-only / secret files to a Vercel build context.
+# (Vercel injects env vars from the dashboard; these are not needed.)
+.env*
+dev.db
+dev.db-shm
+dev.db-wal
+auth
+auth-wal
+src/lib/seedUsers.ts
+
+# Local tooling / artifacts not needed for the build.
+node_modules
+.next
+.git
+.vercel
+.planning
+.claude
