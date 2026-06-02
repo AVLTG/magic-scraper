@@ -57,11 +57,13 @@ describe('cron sync route', () => {
     expect(body).toMatchObject({ success: true, succeeded: 1, failed: 0 })
   })
 
-  it('does NOT call sendDiscordAlert when all users succeed', async () => {
+  it('posts a success alert when all users succeed', async () => {
     mockUpdateAll.mockResolvedValue({ succeeded: ['Alice', 'Bob'], failed: [] })
     const req = makeCronRequest('Bearer test-cron-secret-123')
     await GET(req)
-    expect(mockSendDiscord).not.toHaveBeenCalled()
+    expect(mockSendDiscord).toHaveBeenCalledTimes(1)
+    const alertArg = mockSendDiscord.mock.calls[0][0]
+    expect(alertArg.content).toContain('2 user(s) synced successfully')
   })
 
   it('calls sendDiscordAlert when at least one user fails', async () => {
@@ -87,5 +89,23 @@ describe('cron sync route', () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body).toMatchObject({ success: false })
+  })
+
+  it('posts a failure alert to Discord when updateAllCollections throws (no silent failures)', async () => {
+    mockUpdateAll.mockRejectedValueOnce(new Error('DB unreachable'))
+    const req = makeCronRequest('Bearer test-cron-secret-123')
+    const response = await GET(req)
+    expect(mockSendDiscord).toHaveBeenCalledTimes(1)
+    const alertArg = mockSendDiscord.mock.calls[0][0]
+    expect(alertArg.content).toContain('DB unreachable')
+    expect(response.status).toBe(500)
+  })
+
+  it('still returns 500 even if the failure alert itself fails to post', async () => {
+    mockUpdateAll.mockRejectedValueOnce(new Error('boom'))
+    mockSendDiscord.mockRejectedValueOnce(new Error('discord down'))
+    const req = makeCronRequest('Bearer test-cron-secret-123')
+    const response = await GET(req)
+    expect(response.status).toBe(500)
   })
 })

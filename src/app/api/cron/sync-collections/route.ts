@@ -26,6 +26,13 @@ export async function GET(request: NextRequest) {
     return Response.json({ success: true, succeeded: succeeded.length, failed: failed.length })
   } catch (error) {
     console.error('Cron sync failed:', error)
+    // Hard failure (e.g. DB unreachable) throws before the per-user loop, so no
+    // ⚠️/✅ summary is sent. Alert explicitly so a total failure is never silent.
+    await sendDiscordAlert({
+      content: `❌ Nightly sync crashed before completing: ${String(error)}`,
+    }).catch((alertError) => {
+      console.error('Failed to post cron-failure alert to Discord:', alertError)
+    })
     return Response.json({ success: false, error: String(error) }, { status: 500 })
   }
 }
