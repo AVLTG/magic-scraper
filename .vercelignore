@@ -4,8 +4,11 @@
 dev.db
 dev.db-shm
 dev.db-wal
-auth
-auth-wal
+# Root-anchored (leading slash) so these match ONLY the Turso CLI artifacts at
+# the repo root — a bare "auth" would also match src/app/api/auth/ and drop the
+# login/logout routes from the build.
+/auth
+/auth-wal
 src/lib/seedUsers.ts
 
 # Local tooling / artifacts not needed for the build.
