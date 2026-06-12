@@ -11,10 +11,16 @@ datasource db {
 model User {
   id                    String            @id @default(cuid())
   name                  String
-  moxfieldCollectionId  String            @unique
+  moxfieldCollectionId  String?           @unique
   lastUpdated           DateTime          @default(now())
+  username              String?           @unique
+  passwordHash          String?
+  role                  String            @default("MEMBER")
+  createdAt             DateTime          @default(now())
   collectionCards       CollectionCard[]
   syncLogs              SyncLog[]
+  invitesCreated        Invite[]          @relation("InviteCreator")
+  invitesTargeting      Invite[]          @relation("InviteTarget")
 
   @@map("users")
 }
@@ -85,4 +91,23 @@ model SyncLog {
 
   @@index([userId, createdAt])
   @@map("sync_logs")
+}
+
+model Invite {
+  id                String    @id @default(cuid())
+  tokenHash         String    @unique
+  targetUserId      String?
+  suggestedUsername String?
+  role              String    @default("MEMBER")
+  createdByUserId   String?
+  usedAt            DateTime?
+  expiresAt         DateTime
+  createdAt         DateTime  @default(now())
+
+  targetUser User? @relation("InviteTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  createdBy  User? @relation("InviteCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([targetUserId])
+  @@index([createdAt])
+  @@map("invites")
 }
