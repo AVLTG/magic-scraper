@@ -18,6 +18,7 @@ tabletally is an MTG collection checker for friend groups. It lets any member of
 10. [Post-Deploy Verification](#post-deploy-verification)
 11. [Seed Users](#seed-users)
 12. [Troubleshooting](#troubleshooting)
+13. [Develop / Staging Environment](#develop--staging-environment)
 
 ---
 
@@ -283,3 +284,29 @@ The `COLLECTION_ID` is the alphanumeric string at the end of the URL. Copy that 
 **Build fails with Prisma errors**
 - Run `npx prisma generate` locally and commit any generated files if needed
 - Ensure `DATABASE_URL` is set in Vercel env vars before the build runs
+
+---
+
+## Develop / Staging Environment
+
+The `develop` branch auto-deploys to a Vercel Preview at
+`https://magic-scraper-git-develop-avltgs-projects.vercel.app` — an isolated
+staging mirror for in-progress work (issue #5 + its sub-issues) that never
+touches production:
+
+- **Database**: a fork of prod, `tabletally-dev`
+  (`turso db create tabletally-dev --from-db tabletally`). Branch-scoped
+  `DATABASE_URL` / `DATABASE_AUTH_TOKEN` Preview env vars point `develop` at the
+  fork, so migrations run on `develop` never alter production data.
+- **Secrets**: `COOKIE_SECRET`, `GROUP_PASSWORD`, `ADMIN_PASSWORD`, `CRON_SECRET`
+  are inherited from the shared Preview scope (same login as prod).
+- **Discord**: disabled on `develop` (placeholder `DISCORD_WEBHOOK_URL`) so test
+  games don't post to the real channel.
+- **Cron**: Vercel Cron runs on **production only** — `develop` does not
+  nightly-sync. Use the admin "Update Collections" button to refresh
+  `tabletally-dev` on demand.
+
+Every push to `develop` triggers a fresh preview build. To reset the staging
+data back to a copy of production, drop and re-fork:
+`turso db destroy tabletally-dev && turso db create tabletally-dev --from-db tabletally`
+(then re-mint the token and update the branch-scoped `DATABASE_AUTH_TOKEN`).
