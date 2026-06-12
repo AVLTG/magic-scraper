@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import InvitesSection from "./invites-section";
 
 function StatusDot({ status }: { status: "success" | "failure" | "unknown" }) {
   const color =
@@ -374,6 +375,9 @@ export default function AdminPage() {
           </p>
         )}
       </div>
+
+      {/* Invites section */}
+      <InvitesSection />
 
       {/* Update All Collections section */}
       <div className="rounded-lg border border-border bg-surface p-6">
