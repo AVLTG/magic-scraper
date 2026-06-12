@@ -44,7 +44,13 @@ export async function resolveCards(
     const batch = identifiers.slice(i, i + BATCH_SIZE)
     const res = await fetch(SCRYFALL_COLLECTION_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Scryfall rejects requests lacking User-Agent + Accept with HTTP 400,
+      // and Node's fetch sends no User-Agent by default.
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'TableTally/1.0',
+      },
       body: JSON.stringify({
         identifiers: batch.map((b) => ({ set: b.set.toLowerCase(), collector_number: b.collectorNumber })),
       }),

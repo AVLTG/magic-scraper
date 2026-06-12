@@ -28,6 +28,10 @@ describe('resolveCards', () => {
     expect(notFound).toEqual([{ set: 'xxx', collectorNumber: '999' }])
     const body = JSON.parse(mockFetch.mock.calls[0][1].body)
     expect(body.identifiers[0]).toEqual({ set: 'afr', collector_number: '261' })
+    // Scryfall 400s requests without these headers — pin them
+    const headers = mockFetch.mock.calls[0][1].headers
+    expect(headers['User-Agent']).toBe('TableTally/1.0')
+    expect(headers.Accept).toBe('application/json')
   })
 
   it('batches requests at 75 identifiers', async () => {

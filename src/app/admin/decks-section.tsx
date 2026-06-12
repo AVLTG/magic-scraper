@@ -25,8 +25,9 @@ export default function DecksSection() {
           setDecks(Array.isArray(data.decks) ? data.decks : []);
         }
         if (uRes.ok) {
+          // GET /api/admin/users returns a bare array (no wrapper object)
           const data = await uRes.json();
-          setUsers(Array.isArray(data.users) ? data.users : []);
+          setUsers(Array.isArray(data) ? data : []);
         }
       } catch {
         setStatus("Failed to load decks");
