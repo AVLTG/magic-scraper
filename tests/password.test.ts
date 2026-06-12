@@ -36,4 +36,17 @@ describe('scrypt password hashing', () => {
     expect(await verifyPassword('whatever1', 'scrypt$16384$8$16$aabb$ccdd')).toBe(false)
     expect(Date.now() - start).toBeLessThan(500)
   })
+
+  it('rejects wrong-length salt or hash before any scrypt work (no keylen DoS)', async () => {
+    const start = Date.now()
+    const goodSalt = 'ab'.repeat(16) // 32 hex chars
+    const goodHash = 'cd'.repeat(64) // 128 hex chars
+    // oversized hash blob would otherwise dictate a huge keylen
+    expect(await verifyPassword('whatever1', `scrypt$16384$8$1$${goodSalt}$${'ef'.repeat(50_000)}`)).toBe(false)
+    // short salt / short hash / uppercase hex all rejected
+    expect(await verifyPassword('whatever1', `scrypt$16384$8$1$abcd$${goodHash}`)).toBe(false)
+    expect(await verifyPassword('whatever1', `scrypt$16384$8$1$${goodSalt}$abcd`)).toBe(false)
+    expect(await verifyPassword('whatever1', `scrypt$16384$8$1$${goodSalt.toUpperCase()}$${goodHash}`)).toBe(false)
+    expect(Date.now() - start).toBeLessThan(500)
+  })
 })

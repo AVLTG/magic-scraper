@@ -34,14 +34,17 @@ export async function verifyPassword(password: string, stored: string): Promise<
   try {
     const parts = stored.split('$')
     if (parts.length !== 6 || parts[0] !== 'scrypt') return false
+    // Pin salt/hash lengths to what hashPassword writes BEFORE any allocation —
+    // a tampered row must not pick its own keylen or oversized buffers
+    if (!/^[0-9a-f]{32}$/.test(parts[4]) || !/^[0-9a-f]{128}$/.test(parts[5])) return false
     const n = parseInt(parts[1], 10)
     const r = parseInt(parts[2], 10)
     const p = parseInt(parts[3], 10)
+    if (!n || !r || !p) return false
+    if (n > MAX_N || r > MAX_R || p > MAX_P) return false
     const salt = Buffer.from(parts[4], 'hex')
     const expected = Buffer.from(parts[5], 'hex')
-    if (!n || !r || !p || salt.length === 0 || expected.length === 0) return false
-    if (n > MAX_N || r > MAX_R || p > MAX_P) return false
-    const actual = await scrypt(password, salt, expected.length, { N: n, r, p })
+    const actual = await scrypt(password, salt, KEYLEN, { N: n, r, p })
     return timingSafeEqual(actual, expected)
   } catch {
     return false
