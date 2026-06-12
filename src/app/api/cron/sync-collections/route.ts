@@ -11,6 +11,17 @@ export async function GET(request: NextRequest) {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  // Automatic sync is production-only. On preview/staging (e.g. the `develop`
+  // deployment) this short-circuits so we never burn scraper tokens or ping
+  // Discord automatically — staging is manual-sync only via the admin panel.
+  // VERCEL_ENV is unset locally, so local `npm run dev` testing is unaffected.
+  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
+    return Response.json(
+      { skipped: true, reason: `automatic sync disabled in ${process.env.VERCEL_ENV} environment` },
+      { status: 200 }
+    )
+  }
+
   try {
     const { succeeded, failed } = await updateAllCollections('cron')
     if (failed.length > 0) {

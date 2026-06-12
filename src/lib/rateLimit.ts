@@ -31,6 +31,10 @@ export function checkRateLimit(
 }
 
 export function getIpKey(request: Request): string {
+  // Prefer x-real-ip: set by the Vercel proxy itself, not client-spoofable.
+  // The left-most x-forwarded-for entry can be attacker-supplied on some stacks.
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
   const forwarded = request.headers.get('x-forwarded-for');
   return forwarded?.split(',')[0]?.trim() ?? 'unknown';
 }
