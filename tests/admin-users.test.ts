@@ -52,7 +52,7 @@ describe('GET /api/admin/users', () => {
     const result = await GET();
 
     expect(mockFindMany).toHaveBeenCalledWith({
-      select: { id: true, name: true, moxfieldCollectionId: true },
+      select: { id: true, name: true, moxfieldCollectionId: true, username: true, role: true },
       orderBy: { name: 'asc' },
     });
     expect((result as any).status).toBe(200);

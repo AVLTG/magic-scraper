@@ -1,32 +1,29 @@
-/**
- * Tests for proxy.ts route protection
- * Tests the proxy function directly by mocking NextRequest/NextResponse
- */
-
-// Must set COOKIE_SECRET before any imports that reference it
 process.env.COOKIE_SECRET = 'test-secret-for-proxy-tests-32chars!!'
 
-import { signCookie, COOKIE_NAMES } from '@/lib/auth'
+import { createSessionToken, COOKIE_NAMES } from '@/lib/auth'
 
-// Mock next/server before importing proxy
 const mockRedirect = jest.fn((url: URL) => ({ type: 'redirect', url: url.toString(), status: 307 }))
 const mockNext = jest.fn(() => ({ type: 'next' }))
+const mockJson = jest.fn((body: unknown, init?: { status?: number }) => ({
+  type: 'json',
+  body,
+  status: init?.status ?? 200,
+}))
 
 jest.mock('next/server', () => ({
   NextResponse: {
     redirect: (url: URL) => mockRedirect(url),
     next: () => mockNext(),
+    json: (body: unknown, init?: { status?: number }) => mockJson(body, init),
   },
 }))
 
-// Import proxy after mocks are set up
 import { proxy } from '../proxy'
 
 function makeMockRequest(pathname: string, cookies: Record<string, string> = {}): any {
-  const url = `http://localhost${pathname}`
   return {
     nextUrl: { pathname },
-    url,
+    url: `http://localhost${pathname}`,
     cookies: {
       get: (name: string) => {
         const value = cookies[name]
@@ -36,79 +33,82 @@ function makeMockRequest(pathname: string, cookies: Record<string, string> = {})
   }
 }
 
-describe('proxy route protection', () => {
+describe('proxy route protection (per-user sessions)', () => {
   beforeEach(() => {
     mockRedirect.mockClear()
     mockNext.mockClear()
-    // Reset mock return values
-    mockRedirect.mockImplementation((url: URL) => ({ type: 'redirect', url: url.toString(), status: 307 }))
-    mockNext.mockImplementation(() => ({ type: 'next' }))
+    mockJson.mockClear()
   })
 
   it('redirects unauthenticated request to /login', async () => {
-    const req = makeMockRequest('/')
-    await proxy(req)
+    await proxy(makeMockRequest('/'))
     expect(mockRedirect).toHaveBeenCalledTimes(1)
-    const redirectUrl: URL = mockRedirect.mock.calls[0][0]
-    expect(redirectUrl.pathname).toBe('/login')
+    expect(mockRedirect.mock.calls[0][0].pathname).toBe('/login')
   })
 
-  it('allows valid session cookie through', async () => {
-    const validCookie = await signCookie(COOKIE_NAMES.session)
-    const req = makeMockRequest('/', { [COOKIE_NAMES.session]: validCookie })
-    await proxy(req)
+  it('allows a valid MEMBER session through to app routes', async () => {
+    const token = await createSessionToken('user_1', 'MEMBER')
+    await proxy(makeMockRequest('/checkDeck', { [COOKIE_NAMES.session]: token }))
     expect(mockNext).toHaveBeenCalledTimes(1)
     expect(mockRedirect).not.toHaveBeenCalled()
   })
 
-  it('skips /login path', async () => {
-    const req = makeMockRequest('/login')
-    await proxy(req)
-    expect(mockNext).toHaveBeenCalledTimes(1)
-    expect(mockRedirect).not.toHaveBeenCalled()
-  })
-
-  it('skips /api/auth paths', async () => {
-    const req = makeMockRequest('/api/auth/login')
-    await proxy(req)
-    expect(mockNext).toHaveBeenCalledTimes(1)
-    expect(mockRedirect).not.toHaveBeenCalled()
-  })
-
-  it('redirects group user from admin to /login with admin-required message', async () => {
-    const validSession = await signCookie(COOKIE_NAMES.session)
-    const req = makeMockRequest('/admin', { [COOKIE_NAMES.session]: validSession })
-    await proxy(req)
+  it('rejects an expired session', async () => {
+    const token = await createSessionToken('user_1', 'MEMBER', -10)
+    await proxy(makeMockRequest('/', { [COOKIE_NAMES.session]: token }))
     expect(mockRedirect).toHaveBeenCalledTimes(1)
-    const redirectUrl: URL = mockRedirect.mock.calls[0][0]
-    expect(redirectUrl.pathname).toBe('/login')
-    expect(redirectUrl.searchParams.get('message')).toBe('admin-required')
   })
 
-  it('allows admin session cookie through to /admin', async () => {
-    const validSession = await signCookie(COOKIE_NAMES.session)
-    const validAdmin = await signCookie(COOKIE_NAMES.adminSession)
-    const req = makeMockRequest('/admin', {
-      [COOKIE_NAMES.session]: validSession,
-      [COOKIE_NAMES.adminSession]: validAdmin,
-    })
-    await proxy(req)
+  it('blocks MEMBER from /admin with admin-required message', async () => {
+    const token = await createSessionToken('user_1', 'MEMBER')
+    await proxy(makeMockRequest('/admin', { [COOKIE_NAMES.session]: token }))
+    const url: URL = mockRedirect.mock.calls[0][0]
+    expect(url.pathname).toBe('/login')
+    expect(url.searchParams.get('message')).toBe('admin-required')
+  })
+
+  it('blocks MEMBER from /api/admin routes with 403 JSON (no HTML redirect for APIs)', async () => {
+    const token = await createSessionToken('user_1', 'MEMBER')
+    const result: any = await proxy(makeMockRequest('/api/admin/users', { [COOKIE_NAMES.session]: token }))
+    expect(result.status).toBe(403)
+    expect(mockRedirect).not.toHaveBeenCalled()
+  })
+
+  it('returns 401 JSON for unauthenticated protected API routes', async () => {
+    const result: any = await proxy(makeMockRequest('/api/games'))
+    expect(result.status).toBe(401)
+    expect(mockRedirect).not.toHaveBeenCalled()
+  })
+
+  it('allows ADMIN through to /admin', async () => {
+    const token = await createSessionToken('user_admin', 'ADMIN')
+    await proxy(makeMockRequest('/admin', { [COOKIE_NAMES.session]: token }))
     expect(mockNext).toHaveBeenCalledTimes(1)
     expect(mockRedirect).not.toHaveBeenCalled()
   })
 
-  it('redirects after logout when session cookie is cleared', async () => {
-    const req = makeMockRequest('/checkDeck')
-    await proxy(req)
+  it('skips exempt paths without a session', async () => {
+    for (const path of ['/login', '/api/auth/login', '/api/auth/signup', '/invite/some-token', '/api/invites/some-token', '/api/cron/sync-collections']) {
+      mockNext.mockClear()
+      mockRedirect.mockClear()
+      await proxy(makeMockRequest(path))
+      expect(mockNext).toHaveBeenCalledTimes(1)
+      expect(mockRedirect).not.toHaveBeenCalled()
+    }
+  })
+
+  it('ignores legacy signCookie-style cookie values', async () => {
+    await proxy(makeMockRequest('/', { [COOKIE_NAMES.session]: 'aabbcc112233' }))
     expect(mockRedirect).toHaveBeenCalledTimes(1)
-    const redirectUrl: URL = mockRedirect.mock.calls[0][0]
-    expect(redirectUrl.pathname).toBe('/login')
   })
 
-  it('skips /api/cron paths without session cookie', async () => {
-    const req = makeMockRequest('/api/cron/sync-collections')
-    await proxy(req)
-    expect(mockNext).toHaveBeenCalledTimes(1)
-    expect(mockRedirect).not.toHaveBeenCalled()
+  it('does not treat prefix-shadowing paths as public', async () => {
+    for (const path of ['/loginfoo', '/invitees', '/api/authz/thing', '/api/invitesque']) {
+      mockNext.mockClear()
+      mockRedirect.mockClear()
+      mockJson.mockClear()
+      await proxy(makeMockRequest(path))
+      expect(mockNext).not.toHaveBeenCalled()
+    }
   })
 })
