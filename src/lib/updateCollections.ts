@@ -55,7 +55,7 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
       // Atomic: all three operations commit together or none do
       await prisma.$transaction(async (tx) => {
         const deleteResult = await tx.collectionCard.deleteMany({
-          where: { userId: user.id }
+          where: { userId: user.id, source: 'moxfield' }
         });
         console.log(`Deleted ${deleteResult.count} old cards`);
 
@@ -70,6 +70,7 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
             condition: card.condition,
             isFoil: card.isFoil,
             typeLine: card.type_line,
+            source: 'moxfield',
           }))
         });
         console.log(`Inserted ${createResult.count} new cards`);
@@ -151,7 +152,7 @@ export async function updateUserCollection(
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.collectionCard.deleteMany({ where: { userId: user.id } });
+      await tx.collectionCard.deleteMany({ where: { userId: user.id, source: 'moxfield' } });
       await tx.collectionCard.createMany({
         data: cards.map(card => ({
           userId: user.id,
@@ -163,6 +164,7 @@ export async function updateUserCollection(
           condition: card.condition,
           isFoil: card.isFoil,
           typeLine: card.type_line,
+          source: 'moxfield',
         })),
       });
       await tx.user.update({ where: { id: user.id }, data: { lastUpdated: new Date() } });

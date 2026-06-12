@@ -21,6 +21,7 @@ model User {
   syncLogs              SyncLog[]
   invitesCreated        Invite[]          @relation("InviteCreator")
   invitesTargeting      Invite[]          @relation("InviteTarget")
+  decks                 Deck[]
 
   @@map("users")
 }
@@ -36,6 +37,7 @@ model CollectionCard {
   condition   String
   isFoil      Boolean
   typeLine    String
+  source      String   @default("moxfield")
   lastUpdated DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -110,4 +112,33 @@ model Invite {
   @@index([targetUserId])
   @@index([createdAt])
   @@map("invites")
+}
+
+model Deck {
+  id          String   @id @default(cuid())
+  ownerUserId String?
+  name        String
+  createdAt   DateTime @default(now())
+
+  owner User?      @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  cards DeckCard[]
+
+  @@index([ownerUserId])
+  @@map("decks")
+}
+
+model DeckCard {
+  id              String  @id @default(cuid())
+  deckId          String
+  cardName        String
+  quantity        Int     @default(1)
+  set             String?
+  collectorNumber String?
+  isFoil          Boolean @default(false)
+
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, cardName])
+  @@index([cardName])
+  @@map("deck_cards")
 }
