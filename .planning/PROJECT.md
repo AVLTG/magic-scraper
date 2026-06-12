@@ -46,6 +46,7 @@ Friends can instantly see who in the group owns any card from a decklist, and ch
 - [ ] Scraper health dashboard with logging
 - [ ] Self-service password reset — no flow today; admin manually clears credentials + issues a new bound invite (#6 follow-up)
 - [ ] Password change for logged-in users (account settings page) (#6 follow-up)
+- [ ] Per-user decks & card library (#7) — Deck/DeckCard models, /decks + /library pages, tiered games dropdown, Moxfield plaintext import (in progress on `feature/user-decks-library`)
 
 ## Current Milestone: v1.1 Game Tracking & Polish
 
@@ -96,6 +97,8 @@ Friends can instantly see who in the group owns any card from a decklist, and ch
 | Collection update in Prisma transaction | Prevents partial data loss during deleteMany + createMany | ✓ Good — atomic operations |
 | maxDuration=300 on cron route | Fluid Compute budget for multi-user sync | ✓ Good — sufficient for current user count |
 | Per-user accounts via admin invites (#6) | Per-user decks/library (#5) need identity; shared password retired via env-gated legacy bootstrap (`ALLOW_LEGACY_LOGIN`) | — in progress on `feature/user-accounts` |
+| Decks store cards by value, not FK (#7) | Nightly sync deletes+recreates CollectionCard rows; FKs would orphan daily | — in progress |
+| CollectionCard.source column for manual adds (#7) | One library source of truth; sync only replaces source='moxfield' | — in progress |
 
 ## Evolution
 

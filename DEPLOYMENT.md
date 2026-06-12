@@ -356,3 +356,32 @@ only as an env-gated bootstrap.
 - Password reset: no self-service flow — delete the user's `username`/
   `passwordHash` … or simpler, have the admin create a new *bound* invite once
   the username is cleared. (Tracked as future work.)
+
+---
+
+## Decks & Card Library Migration (issue #7)
+
+One additive migration (`add_decks_and_card_library`) plus a one-time backfill script.
+No new environment variables — Scryfall's API is keyless.
+
+1. **Apply the migration** (same Turso procedure as issue #6 — prisma's CLI rejects
+   libsql URLs, so generate SQL and pipe it through the Turso shell):
+   ```bash
+   npx prisma migrate diff --from-url "file:./prod-snapshot.db" \
+     --to-schema-datamodel prisma/schema.prisma --script > /tmp/decks-migration.sql
+   # review the SQL, then:
+   turso db shell tabletally < /tmp/decks-migration.sql
+   ```
+   The migration is additive (new `decks`/`deck_cards` tables, new
+   `collection_cards.source` column defaulting to `'moxfield'`) — no data loss.
+
+2. **Run the legacy deck backfill** (idempotent; creates a Deck per distinct
+   historical deckName, owned by the user who played it most):
+   ```bash
+   DATABASE_URL="libsql://<db>.turso.io" DATABASE_AUTH_TOKEN="<token>" \
+     node src/scripts/backfillDecks.ts
+   ```
+   Review the printed deck→owner table; fix stragglers in Admin → Decks.
+
+3. Nightly sync now only replaces `source='moxfield'` rows — manually added
+   library cards survive automatically.
