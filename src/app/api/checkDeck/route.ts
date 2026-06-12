@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseDeckList } from '@/lib/parseDeck';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { normalizeCardName } from '@/lib/parseMoxfield';
 
 export async function POST(request: Request) {
   const rl = checkRateLimit(getIpKey(request), 10, 60000);
@@ -41,6 +42,23 @@ export async function POST(request: Request) {
       ]
     });
 
+    // Deck associations (issue #7): which of each OWNER's decks contain the card
+    const ownerIds = Array.from(new Set(matches.map((m) => m.userId)));
+    const deckCards = ownerIds.length
+      ? await prisma.deckCard.findMany({
+          where: { deck: { ownerUserId: { in: ownerIds } } },
+          include: { deck: { select: { name: true, ownerUserId: true } } },
+        })
+      : [];
+    const decksByOwnerCard = new Map<string, string[]>();
+    for (const dc of deckCards) {
+      if (!dc.deck.ownerUserId) continue;
+      const key = `${dc.deck.ownerUserId}:${normalizeCardName(dc.cardName)}`;
+      const list = decksByOwnerCard.get(key) ?? [];
+      if (!list.includes(dc.deck.name)) list.push(dc.deck.name);
+      decksByOwnerCard.set(key, list);
+    }
+
     // Group by card name, then by printing
     const grouped: Record<string, any> = {};
 
@@ -63,7 +81,8 @@ export async function POST(request: Request) {
         name: match.user.name,
         quantity: match.quantity,
         condition: match.condition,
-        isFoil: match.isFoil
+        isFoil: match.isFoil,
+        decks: decksByOwnerCard.get(`${match.userId}:${normalizeCardName(match.cardName)}`) ?? [],
       });
     }
 
