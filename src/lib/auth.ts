@@ -5,7 +5,6 @@ const SECRET = process.env.COOKIE_SECRET!
 
 export const COOKIE_NAMES = {
   session: 'session',
-  adminSession: 'admin_session',
 } as const
 
 export const COOKIE_OPTIONS = {
@@ -44,21 +43,6 @@ function hexToBytes(hex: string): ArrayBuffer {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)
   }
   return buf
-}
-
-export async function signCookie(cookieName: string): Promise<string> {
-  const key = await getKey()
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(cookieName))
-  return bytesToHex(sig)
-}
-
-export async function verifyHmac(value: string, cookieName: string): Promise<boolean> {
-  try {
-    const key = await getKey()
-    return crypto.subtle.verify('HMAC', key, hexToBytes(value), new TextEncoder().encode(cookieName))
-  } catch {
-    return false
-  }
 }
 
 export type SessionRole = 'ADMIN' | 'MEMBER'

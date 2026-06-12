@@ -18,7 +18,7 @@ jest.mock('next/server', () => ({
   },
 }))
 
-import { proxy } from '../proxy'
+import { proxy } from '../src/proxy'
 
 function makeMockRequest(pathname: string, cookies: Record<string, string> = {}): any {
   return {
