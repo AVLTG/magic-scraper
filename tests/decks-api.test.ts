@@ -36,9 +36,11 @@ const LEGACY = { userId: '__legacy_admin__', role: 'ADMIN', isLegacyAdmin: true 
 import { GET, POST } from '../src/app/api/decks/route'
 
 const DB_DECKS = [
-  { id: 'd1', name: 'Krenko', ownerUserId: 'u1', createdAt: new Date(), owner: { name: 'Alice' }, _count: { cards: 3 } },
-  { id: 'd2', name: 'Esper', ownerUserId: 'u2', createdAt: new Date(), owner: { name: 'Bob' }, _count: { cards: 0 } },
-  { id: 'd3', name: 'Slivers', ownerUserId: null, createdAt: new Date(), owner: null, _count: { cards: 0 } },
+  // 'Krenko' has a 12-of basic + two singles -> 14 total cards across 3 rows,
+  // proving cardCount sums quantities rather than counting rows.
+  { id: 'd1', name: 'Krenko', ownerUserId: 'u1', createdAt: new Date(), owner: { name: 'Alice' }, cards: [{ quantity: 12 }, { quantity: 1 }, { quantity: 1 }] },
+  { id: 'd2', name: 'Esper', ownerUserId: 'u2', createdAt: new Date(), owner: { name: 'Bob' }, cards: [] },
+  { id: 'd3', name: 'Slivers', ownerUserId: null, createdAt: new Date(), owner: null, cards: [] },
 ]
 
 describe('GET /api/decks', () => {
@@ -48,7 +50,7 @@ describe('GET /api/decks', () => {
     mockGetSession.mockResolvedValue(MEMBER)
     mockDeckFindMany.mockResolvedValue(DB_DECKS)
     const res: any = await GET(makeRequest())
-    expect(res.body.userDecks).toEqual([{ id: 'd1', name: 'Krenko', cardCount: 3 }])
+    expect(res.body.userDecks).toEqual([{ id: 'd1', name: 'Krenko', cardCount: 14 }])
     expect(res.body.otherDecks).toEqual([
       { id: 'd2', name: 'Esper', cardCount: 0, ownerName: 'Bob' },
       { id: 'd3', name: 'Slivers', cardCount: 0, ownerName: null },

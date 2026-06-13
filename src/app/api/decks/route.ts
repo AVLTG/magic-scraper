@@ -21,15 +21,19 @@ export async function GET(request: Request) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const decks = await prisma.deck.findMany({
-      include: { owner: { select: { name: true } }, _count: { select: { cards: true } } },
+      include: { owner: { select: { name: true } }, cards: { select: { quantity: true } } },
       orderBy: { name: 'asc' },
     });
+    // cardCount is the TOTAL card count (summed quantities), matching the deck
+    // detail page — not the number of distinct rows (a 12-of basic is 12, not 1).
+    const cardCount = (d: { cards: { quantity: number }[] }) =>
+      d.cards.reduce((n, c) => n + c.quantity, 0);
     const userDecks = decks
       .filter((d) => d.ownerUserId === session.userId)
-      .map((d) => ({ id: d.id, name: d.name, cardCount: d._count.cards }));
+      .map((d) => ({ id: d.id, name: d.name, cardCount: cardCount(d) }));
     const otherDecks = decks
       .filter((d) => d.ownerUserId !== session.userId)
-      .map((d) => ({ id: d.id, name: d.name, cardCount: d._count.cards, ownerName: d.owner?.name ?? null }));
+      .map((d) => ({ id: d.id, name: d.name, cardCount: cardCount(d), ownerName: d.owner?.name ?? null }));
     return NextResponse.json({ userDecks, otherDecks, isLegacyAdmin: session.isLegacyAdmin });
   } catch (error) {
     console.error('GET /api/decks error:', error);

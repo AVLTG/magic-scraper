@@ -51,8 +51,8 @@ describe('admin decks', () => {
   it('GET lists decks with owner + card count, ADMIN only', async () => {
     mockGetSession.mockResolvedValue(ADMIN)
     mockDeckFindMany.mockResolvedValue([
-      { id: 'd1', name: 'Krenko', ownerUserId: 'u1', owner: { name: 'Alice' }, _count: { cards: 5 } },
-      { id: 'd2', name: 'Slivers', ownerUserId: null, owner: null, _count: { cards: 0 } },
+      { id: 'd1', name: 'Krenko', ownerUserId: 'u1', owner: { name: 'Alice' }, cards: [{ quantity: 4 }, { quantity: 1 }] },
+      { id: 'd2', name: 'Slivers', ownerUserId: null, owner: null, cards: [] },
     ])
     const res: any = await GET(makeRequest())
     expect(res.body.decks).toEqual([

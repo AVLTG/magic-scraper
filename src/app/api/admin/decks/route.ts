@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     }
 
     const decks = await prisma.deck.findMany({
-      include: { owner: { select: { name: true } }, _count: { select: { cards: true } } },
+      include: { owner: { select: { name: true } }, cards: { select: { quantity: true } } },
       orderBy: { name: 'asc' },
     });
     return NextResponse.json({
@@ -28,7 +28,8 @@ export async function GET(request: Request) {
         name: d.name,
         ownerUserId: d.ownerUserId,
         ownerName: d.owner?.name ?? null,
-        cardCount: d._count.cards,
+        // Total card count (summed quantities), consistent with the deck pages.
+        cardCount: d.cards.reduce((n, c) => n + c.quantity, 0),
       })),
     });
   } catch (error) {
