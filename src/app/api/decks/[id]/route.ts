@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
-import { buildLibraryNameIndex, findLibraryName } from '@/lib/parseMoxfield';
+import { buildLibraryNameIndex, findLibraryName, isBasicLand } from '@/lib/parseMoxfield';
 
 export async function GET(
   request: Request,
@@ -49,7 +49,7 @@ export async function GET(
           set: c.set,
           collectorNumber: c.collectorNumber,
           isFoil: c.isFoil,
-          inLibrary: findLibraryName(libIndex, c.cardName) !== undefined,
+          inLibrary: isBasicLand(c.cardName) || findLibraryName(libIndex, c.cardName) !== undefined,
         })),
       },
     });

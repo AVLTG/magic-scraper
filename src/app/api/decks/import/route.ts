@@ -8,6 +8,7 @@ import {
   buildLibraryNameIndex,
   findLibraryName,
   normalizeCardName,
+  isBasicLand,
   type ParsedMoxfieldCard,
 } from '@/lib/parseMoxfield';
 import { resolveCards, scryfallKey } from '@/lib/scryfall';
@@ -56,7 +57,14 @@ export async function POST(request: Request) {
 
     const present: Array<{ card: ParsedMoxfieldCard; canonical: string }> = [];
     const missing: ParsedMoxfieldCard[] = [];
+    const basics: ParsedMoxfieldCard[] = [];
     for (const c of cards) {
+      // Basic lands never exist in scraped collections — they import freely
+      // (into the deck only) and never trigger the missing-cards prompt.
+      if (isBasicLand(c.name)) {
+        basics.push(c);
+        continue;
+      }
       const canonical = findLibraryName(libIndex, c.name);
       if (canonical) present.push({ card: c, canonical });
       else missing.push(c);
@@ -96,6 +104,7 @@ export async function POST(request: Request) {
       else deckCardMap.set(key, { cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil });
     };
     for (const { card, canonical } of present) addDraft(canonical, card);
+    for (const card of basics) addDraft(card.name, card);
 
     const libraryInserts: Array<Record<string, unknown>> = [];
     let excluded: string[] = [];

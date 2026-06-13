@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
-import { parseMoxfieldText, type ParsedMoxfieldCard } from '@/lib/parseMoxfield';
+import { parseMoxfieldText, isBasicLand, type ParsedMoxfieldCard } from '@/lib/parseMoxfield';
 import { resolveCards, scryfallKey } from '@/lib/scryfall';
 
 const bodySchema = z.object({ text: z.string().min(1).max(50_000) });
@@ -32,6 +32,14 @@ export async function POST(request: Request) {
 
     const resolvable: ParsedMoxfieldCard[] = [];
     for (const c of parsed.cards) {
+      if (isBasicLand(c.name)) {
+        errors.push({
+          line: c.line,
+          raw: `${c.quantity} ${c.name}`,
+          reason: 'Basic lands are not tracked in collections — skipped',
+        });
+        continue;
+      }
       if (!c.set || !c.collectorNumber) {
         errors.push({
           line: c.line,

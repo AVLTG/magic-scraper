@@ -122,4 +122,17 @@ describe('PUT /api/decks/[id]/cards', () => {
     mockDeckFindUnique.mockResolvedValue({ ...OWNED, ownerUserId: null })
     expect(((await PUT(makeRequest({ add: [] }), params)) as any).status).toBe(403)
   })
+
+  it('allows adding basic lands without library membership', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    mockDeckFindUnique.mockResolvedValue(OWNED)
+    mockCollectionFindMany.mockResolvedValue([])
+    const res: any = await PUT(makeRequest({ add: [{ cardName: 'Plains', quantity: 4 }] }), params)
+    expect(res.status).toBe(200)
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { deckId_cardName: { deckId: 'd1', cardName: 'Plains' } },
+      })
+    )
+  })
 })

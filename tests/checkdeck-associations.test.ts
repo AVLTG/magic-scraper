@@ -48,4 +48,20 @@ describe('POST /api/checkDeck deck associations', () => {
     const res: any = await POST(makeRequest({ decklist: 'Sol Ring' }))
     expect(res.body.results[0].printings[0].owners[0].decks).toEqual([])
   })
+
+  it('tolerates Moxfield-export pastes: strips "(SET) NUM *F*" and queries MDFC name variants', async () => {
+    mockCollectionFindMany.mockResolvedValue([])
+    mockDeckCardFindMany.mockResolvedValue([])
+    await POST(
+      makeRequest({ decklist: '1 Treasure Vault (AFR) 261 *F*\n1 Spikefield Hazard / Spikefield Cave (ZNR) 166' })
+    )
+    const queried = mockCollectionFindMany.mock.calls[0][0].where.cardName.in
+    expect(queried).toEqual(
+      expect.arrayContaining([
+        'Treasure Vault',
+        'Spikefield Hazard / Spikefield Cave',
+        'Spikefield Hazard // Spikefield Cave',
+      ])
+    )
+  })
 })

@@ -139,4 +139,14 @@ describe('POST /api/library/cards', () => {
     // identifiers deduped before hitting Scryfall
     expect((mockResolveCards.mock.calls[0][0] as unknown[]).length).toBe(1)
   })
+
+  it('skips basic lands with an informational line (not tracked in collections)', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    const res: any = await POST(makeRequest({ text: '12 Plains (FDN) 269' }))
+    expect(res.status).toBe(200)
+    expect(res.body.added).toEqual([])
+    expect(res.body.errors[0].reason).toMatch(/Basic lands/)
+    expect(mockResolveCards).not.toHaveBeenCalled()
+    expect(mockCollectionCreateMany).not.toHaveBeenCalled()
+  })
 })

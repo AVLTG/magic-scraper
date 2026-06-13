@@ -142,4 +142,23 @@ describe('POST /api/decks/import', () => {
     mockGetSession.mockResolvedValue(LEGACY)
     expect(((await POST(makeRequest({ name: 'X', text: 'y', dryRun: true }))) as any).status).toBe(403)
   })
+
+  it('imports basic lands freely: never missing, in the deck, not added to library', async () => {
+    mockCollectionFindMany.mockResolvedValue([{ cardName: 'Sol Ring' }])
+    const text = '1 Sol Ring (C21) 263\n12 Plains (FDN) 269\n3 Snow-Covered Island (KHM) 278'
+    const dry: any = await POST(makeRequest({ name: 'Landfall', text, dryRun: true }))
+    expect(dry.body.missing).toEqual([])
+    const res: any = await POST(makeRequest({ name: 'Landfall', text, dryRun: false, addMissingToLibrary: false }))
+    expect(res.status).toBe(201)
+    expect(res.body.excluded).toEqual([])
+    const deckCards = mockDeckCreate.mock.calls[0][0].data.cards.create
+    expect(deckCards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ cardName: 'Plains', quantity: 12 }),
+        expect.objectContaining({ cardName: 'Snow-Covered Island', quantity: 3 }),
+        expect.objectContaining({ cardName: 'Sol Ring', quantity: 1 }),
+      ])
+    )
+    expect(mockCollectionCreateMany).not.toHaveBeenCalled()
+  })
 })

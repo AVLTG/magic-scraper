@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
-import { buildLibraryNameIndex, findLibraryName, normalizeCardName } from '@/lib/parseMoxfield';
+import { buildLibraryNameIndex, findLibraryName, normalizeCardName, isBasicLand } from '@/lib/parseMoxfield';
 
 const addSchema = z.object({
   cardName: z.string().trim().min(1).max(200),
@@ -57,6 +57,10 @@ export async function PUT(
       const libIndex = buildLibraryNameIndex(lib.map((c) => c.cardName));
       const unknown: string[] = [];
       canonicalAdds = body.add.map((a) => {
+        // Basic lands bypass the library check — collections never track them.
+        if (isBasicLand(a.cardName)) {
+          return { ...a, canonicalName: a.cardName };
+        }
         const canonicalName = findLibraryName(libIndex, a.cardName);
         if (!canonicalName) unknown.push(a.cardName);
         return { ...a, canonicalName: canonicalName ?? a.cardName };

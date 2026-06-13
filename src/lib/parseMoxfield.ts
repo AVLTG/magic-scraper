@@ -95,3 +95,14 @@ export function findLibraryName(index: LibraryNameIndex, importName: string): st
   }
   return undefined
 }
+
+// Basic lands are excluded from collection scrapes (the Moxfield scraper skips
+// type_line "Basic Land*"), so deck flows treat them as always-available:
+// importable without a library lookup, never added to the library.
+const BASIC_LAND_NAMES = new Set(['plains', 'island', 'swamp', 'mountain', 'forest', 'wastes'])
+
+export function isBasicLand(name: string): boolean {
+  const norm = normalizeCardName(name)
+  if (BASIC_LAND_NAMES.has(norm)) return true
+  return norm.startsWith('snow-covered ') && BASIC_LAND_NAMES.has(norm.slice('snow-covered '.length))
+}

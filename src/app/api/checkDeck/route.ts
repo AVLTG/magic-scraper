@@ -23,7 +23,19 @@ export async function POST(request: Request) {
     }
 
     const parsedCards = parseDeckList(decklist);
-    const cardNames = parsedCards.map(card => card.name);
+    // Collections store MDFCs Scryfall-style ("A // B"); Moxfield exports use
+    // "A / B" — query both spellings so either paste format matches.
+    const cardNames = Array.from(
+      new Set(
+        parsedCards.flatMap((card) => {
+          const variants = [card.name];
+          if (card.name.includes(' / ') && !card.name.includes(' // ')) {
+            variants.push(card.name.replace(/ \/ /g, ' // '));
+          }
+          return variants;
+        })
+      )
+    );
 
     // Find all matching cards
     const matches = await prisma.collectionCard.findMany({
