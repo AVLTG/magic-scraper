@@ -8,6 +8,7 @@ interface Owner {
   quantity: number;
   condition: string;
   isFoil: boolean;
+  decks: string[];
 }
 
 interface Printing {
@@ -204,6 +205,14 @@ export default function CheckDeck() {
                                   {owner.isFoil && (
                                     <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-medium">
                                       Foil
+                                    </span>
+                                  )}
+                                  {owner.decks.length > 0 && (
+                                    <span
+                                      className="text-xs bg-accent-muted text-accent px-1.5 py-0.5 rounded font-medium"
+                                      title={`In deck${owner.decks.length !== 1 ? "s" : ""}: ${owner.decks.join(", ")}`}
+                                    >
+                                      {owner.decks.length === 1 ? owner.decks[0] : `${owner.decks.length} decks`}
                                     </span>
                                   )}
                                 </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import InvitesSection from "./invites-section";
+import DecksSection from "./decks-section";
 
 function StatusDot({ status }: { status: "success" | "failure" | "unknown" }) {
   const color =
@@ -378,6 +379,9 @@ export default function AdminPage() {
 
       {/* Invites section */}
       <InvitesSection />
+
+      {/* Decks section */}
+      <DecksSection />
 
       {/* Update All Collections section */}
       <div className="rounded-lg border border-border bg-surface p-6">

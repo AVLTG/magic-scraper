@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, useId, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useId, KeyboardEvent, Fragment } from 'react';
 
 // Pure helpers (exported for unit tests)
 export function filterItems(items: string[], inputValue: string, excludeItems?: string[]): string[] {
@@ -37,8 +37,38 @@ export function shouldShowExcludedNotice(
   return excludeItems.some((x) => x.trim().toLowerCase() === lower);
 }
 
-export interface ComboboxProps {
+export interface ComboboxGroup {
+  label: string;
   items: string[];
+}
+
+export interface ComboboxSection {
+  label: string;
+  items: string[];
+  start: number; // global option index of this section's first item (headers are not options)
+}
+
+// Pure helper for grouped mode: filter each group, drop empty ones, and assign
+// contiguous global option offsets so keyboard navigation indexes stay flat.
+export function groupSections(
+  groups: ComboboxGroup[],
+  inputValue: string,
+  excludeItems?: string[]
+): ComboboxSection[] {
+  const sections: ComboboxSection[] = [];
+  let offset = 0;
+  for (const g of groups) {
+    const items = filterItems(g.items, inputValue, excludeItems);
+    if (items.length === 0) continue;
+    sections.push({ label: g.label, items, start: offset });
+    offset += items.length;
+  }
+  return sections;
+}
+
+export interface ComboboxProps {
+  items?: string[];
+  groups?: ComboboxGroup[];      // grouped mode (issue #7 deck tiers) — overrides items
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -49,7 +79,8 @@ export interface ComboboxProps {
 }
 
 export function Combobox({
-  items,
+  items = [],
+  groups,
   value,
   onChange,
   placeholder,
@@ -81,11 +112,13 @@ export function Combobox({
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, [isOpen]);
 
-  const filtered = filterItems(items, inputValue, excludeItems);
+  const sections = groups ? groupSections(groups, inputValue, excludeItems) : null;
+  const allItems = groups ? groups.flatMap((g) => g.items) : items;
+  const filtered = sections ? sections.flatMap((s) => s.items) : filterItems(items, inputValue, excludeItems);
   const showExcluded = shouldShowExcludedNotice(excludeItems, inputValue);
   // D-12: the "Add new" affordance is suppressed whenever the collision notice is shown.
   // They are mutually exclusive — either you see "Add xyz as new" OR "Player already in game", never both.
-  const showAddNew = !showExcluded && shouldShowAddNew(items, inputValue);
+  const showAddNew = !showExcluded && shouldShowAddNew(allItems, inputValue);
   const totalRows = filtered.length + (showAddNew ? 1 : 0) + (showExcluded ? 1 : 0);
   const addNewIndex = filtered.length;                          // only valid when showAddNew is true
   const excludedNoticeIndex = filtered.length;                  // same index as addNewIndex because they are mutually exclusive
@@ -177,23 +210,38 @@ export function Combobox({
           role="listbox"
           className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-surface shadow-lg"
         >
-          {filtered.map((item, i) => (
-            <li
-              key={item}
-              id={`${listboxId}-opt-${i}`}
-              role="option"
-              aria-selected={highlightedIndex === i}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                commit(item);
-              }}
-              onMouseEnter={() => setHighlightedIndex(i)}
-              className={`px-3 py-2 cursor-pointer ${
-                highlightedIndex === i ? 'bg-accent-muted text-accent' : 'text-foreground hover:bg-surface-hover'
-              }`}
-            >
-              {item}
-            </li>
+          {(sections ?? [{ label: '', items: filtered, start: 0 }]).map((section) => (
+            <Fragment key={section.label || '__flat__'}>
+              {section.label && (
+                <li
+                  role="presentation"
+                  className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted bg-surface-hover/50 border-t first:border-t-0 border-border select-none"
+                >
+                  {section.label}
+                </li>
+              )}
+              {section.items.map((item, j) => {
+                const i = section.start + j;
+                return (
+                  <li
+                    key={`${section.label}-${item}`}
+                    id={`${listboxId}-opt-${i}`}
+                    role="option"
+                    aria-selected={highlightedIndex === i}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      commit(item);
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(i)}
+                    className={`px-3 py-2 cursor-pointer ${
+                      highlightedIndex === i ? 'bg-accent-muted text-accent' : 'text-foreground hover:bg-surface-hover'
+                    }`}
+                  >
+                    {item}
+                  </li>
+                );
+              })}
+            </Fragment>
           ))}
           {showAddNew && (
             <li

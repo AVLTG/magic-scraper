@@ -8,6 +8,7 @@ import {
   type GameVariant,
 } from '@/lib/validators';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { ensureDecksForParticipants } from '@/lib/deckAutoCreate';
 
 // Prisma "Record not found" error code for update/delete on missing row
 const PRISMA_NOT_FOUND = 'P2025';
@@ -128,6 +129,9 @@ export async function PATCH(
       });
       return g;
     });
+    await ensureDecksForParticipants(
+      participants.map((p) => ({ playerName: p.playerName, deckName: p.deckName, isRandom: p.isRandom ?? false }))
+    );
     return NextResponse.json({ game: updated });
   } catch (error) {
     if (error instanceof z.ZodError) {

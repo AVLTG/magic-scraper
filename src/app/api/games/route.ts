@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { gameCreateSchema } from '@/lib/validators';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { ensureDecksForParticipants } from '@/lib/deckAutoCreate';
 
 export async function POST(request: Request) {
   const rl = checkRateLimit(getIpKey(request), 30, 60000);
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
       });
       return created;
     });
+    await ensureDecksForParticipants(participants);
     return NextResponse.json({ game }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
