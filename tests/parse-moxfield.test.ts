@@ -33,12 +33,20 @@ describe('parseMoxfieldText', () => {
     expect(cards.map((c) => c.line)).toEqual([2, 4])
   })
 
-  it('collects errors for garbage and unknown markers without throwing', () => {
-    const { cards, errors } = parseMoxfieldText('SIDEBOARD:\n1 Treasure Vault (AFR) 261 *E*\n1 Sol Ring (C21) 263')
+  it('accepts the *E* etched marker as a regular (non-foil) card', () => {
+    // The collection scraper stores etched printings as regular cards, so an
+    // etched line must parse (not error) and match the regular library row.
+    const { cards, errors } = parseMoxfieldText('1 Treasure Vault (AFR) 261 *E*')
+    expect(errors).toEqual([])
+    expect(cards[0]).toEqual({ line: 1, quantity: 1, name: 'Treasure Vault', set: 'AFR', collectorNumber: '261', isFoil: false })
+  })
+
+  it('collects errors for garbage and genuinely unknown markers without throwing', () => {
+    const { cards, errors } = parseMoxfieldText('SIDEBOARD:\n1 Treasure Vault (AFR) 261 *Z*\n1 Sol Ring (C21) 263')
     expect(cards).toHaveLength(1)
     expect(errors).toHaveLength(2)
     expect(errors[0].line).toBe(1)
-    expect(errors[1].reason).toMatch(/\*F\*/)
+    expect(errors[1].reason).toMatch(/\*F\*.*\*E\*|\*E\*.*\*F\*/)
   })
 
   it('handles odd collector numbers (letters, stars)', () => {

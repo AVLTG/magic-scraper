@@ -21,9 +21,10 @@ export interface MoxfieldParseResult {
   errors: MoxfieldParseError[]
 }
 
-// qty, lazy name (may contain " / " for MDFCs), optional "(SET) NUM" pair, optional *F*.
-// The lazy name + end-anchored optional groups make "(SET) NUM" bind tightly when present.
-const LINE_RE = /^(\d+)\s+(.+?)(?:\s+\(([A-Za-z0-9]{2,6})\)\s+([^\s*]+))?(\s+\*F\*)?\s*$/
+// qty, lazy name (may contain " / " for MDFCs), optional "(SET) NUM" pair,
+// optional finish marker (*F* foil or *E* etched). The lazy name + end-anchored
+// optional groups make "(SET) NUM" bind tightly when present.
+const LINE_RE = /^(\d+)\s+(.+?)(?:\s+\(([A-Za-z0-9]{2,6})\)\s+([^\s*]+))?(\s+\*[FE]\*)?\s*$/
 
 export function parseMoxfieldText(text: string): MoxfieldParseResult {
   const cards: ParsedMoxfieldCard[] = []
@@ -39,12 +40,13 @@ export function parseMoxfieldText(text: string): MoxfieldParseResult {
       errors.push({ line, raw: trimmed, reason: 'Unrecognized line format' })
       return
     }
-    const [, qtyStr, name, set, collectorNumber, foil] = m
+    const [, qtyStr, name, set, collectorNumber, marker] = m
 
-    // Only *F* is a recognized marker; any other *X* would otherwise be silently
-    // swallowed into the card name, so reject the line instead.
+    // *F* (foil) and *E* (etched) are recognized; any other *X* marker would be
+    // silently swallowed into the card name, so reject the line instead. Etched
+    // is treated as a regular card below — the scraper stores it that way.
     if (/\*[^*]+\*\s*$/.test(name)) {
-      errors.push({ line, raw: trimmed, reason: 'Unsupported marker — only *F* is recognized' })
+      errors.push({ line, raw: trimmed, reason: 'Unsupported marker — only *F* and *E* are recognized' })
       return
     }
 
@@ -60,7 +62,9 @@ export function parseMoxfieldText(text: string): MoxfieldParseResult {
       name: name.trim(),
       set: set?.toUpperCase(),
       collectorNumber,
-      isFoil: foil !== undefined,
+      // Only *F* is foil; *E* (etched) and unmarked are regular, matching how
+      // the collection scraper stores them.
+      isFoil: marker?.trim() === '*F*',
     })
   })
 
