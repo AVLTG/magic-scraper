@@ -56,9 +56,14 @@ export async function POST(request: Request) {
 
     // Deck associations (issue #7): which of each OWNER's decks contain the card
     const ownerIds = Array.from(new Set(matches.map((m) => m.userId)));
-    const deckCards = ownerIds.length
+    // Scope to the matched card names so the query grows with the decklist, not
+    // the owners' entire deck libraries. Deck cards and collection cards share
+    // canonical names (imports/edits store the canonical library name), so this
+    // exact filter is complete for the rows we badge below.
+    const wantedNames = Array.from(new Set(matches.map((m) => m.cardName)));
+    const deckCards = ownerIds.length && wantedNames.length
       ? await prisma.deckCard.findMany({
-          where: { deck: { ownerUserId: { in: ownerIds } } },
+          where: { cardName: { in: wantedNames }, deck: { ownerUserId: { in: ownerIds } } },
           include: { deck: { select: { name: true, ownerUserId: true } } },
         })
       : [];

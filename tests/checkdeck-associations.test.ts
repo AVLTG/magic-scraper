@@ -49,6 +49,22 @@ describe('POST /api/checkDeck deck associations', () => {
     expect(res.body.results[0].printings[0].owners[0].decks).toEqual([])
   })
 
+  it('scopes the deck-card query to the matched card names, not the owners entire libraries', async () => {
+    mockCollectionFindMany.mockResolvedValue([
+      { userId: 'u1', cardName: 'Sol Ring', set: 'c21', setName: 'Commander 2021', scryfallId: 's1', quantity: 1, condition: 'NearMint', isFoil: false, user: { name: 'Alice' } },
+    ])
+    mockDeckCardFindMany.mockResolvedValue([])
+    await POST(makeRequest({ decklist: 'Sol Ring' }))
+    expect(mockDeckCardFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          cardName: { in: ['Sol Ring'] },
+          deck: { ownerUserId: { in: ['u1'] } },
+        }),
+      })
+    )
+  })
+
   it('badges only the collection rows matching the deck card foil/printing', async () => {
     mockCollectionFindMany.mockResolvedValue([
       { userId: 'u1', cardName: 'Greater Tanuki', set: 'neo', setName: 'Kamigawa: Neon Dynasty', scryfallId: 's9', quantity: 1, condition: 'NearMint', isFoil: true, user: { name: 'Alice' } },

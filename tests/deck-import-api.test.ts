@@ -132,6 +132,9 @@ describe('POST /api/decks/import', () => {
     expect(res.status).toBe(201)
     const deckCards = mockDeckCreate.mock.calls[0][0].data.cards.create
     expect(deckCards).toEqual([expect.objectContaining({ cardName: 'Sol Ring', quantity: 3, set: 'C21' })])
+    // cardCount is the TOTAL (summed quantities), matching GET /api/decks and the
+    // deck detail page — not the number of distinct rows.
+    expect(res.body.deck.cardCount).toBe(3)
   })
 
   it('409s duplicate deck names and 403s the legacy admin', async () => {

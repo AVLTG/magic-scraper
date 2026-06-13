@@ -1,4 +1,7 @@
 // One-time legacy deck backfill (issue #7). Idempotent — re-running is a no-op.
+// Run directly with `node` — Node >=22.18 strips TS types natively, which is why
+// the relative imports below carry explicit `.ts` extensions. (`npx tsx ...` also
+// works.) src/scripts is excluded from tsconfig so this doesn't affect the build.
 // Run (local):  DATABASE_URL="file:./prisma/dev.db" node src/scripts/backfillDecks.ts
 // Run (Turso dev, only with explicit human approval):
 //   DATABASE_URL="libsql://tabletally-dev-....turso.io" DATABASE_AUTH_TOKEN="..." node src/scripts/backfillDecks.ts

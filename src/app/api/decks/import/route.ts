@@ -164,9 +164,13 @@ export async function POST(request: Request) {
       });
     });
 
+    // Total card count (summed quantities), consistent with GET /api/decks and
+    // the deck detail page — not the number of distinct rows.
+    const cardCount = Array.from(deckCardMap.values()).reduce((n, c) => n + c.quantity, 0);
+
     return NextResponse.json(
       {
-        deck: { id: deck.id, name: deck.name, cardCount: deckCardMap.size },
+        deck: { id: deck.id, name: deck.name, cardCount },
         addedToLibrary: libraryInserts.length,
         excluded,
         errors,

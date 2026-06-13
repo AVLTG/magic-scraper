@@ -376,7 +376,9 @@ No new environment variables — Scryfall's API is keyless.
    `collection_cards.source` column defaulting to `'moxfield'`) — no data loss.
 
 2. **Run the legacy deck backfill** (idempotent; creates a Deck per distinct
-   historical deckName, owned by the user who played it most):
+   historical deckName, owned by the user who played it most). Run it with
+   `node` — Node ≥22.18 strips the TypeScript natively (the script's `.ts`
+   import extensions are deliberate for this); `npx tsx ...` works too:
    ```bash
    DATABASE_URL="libsql://<db>.turso.io" DATABASE_AUTH_TOKEN="<token>" \
      node src/scripts/backfillDecks.ts
