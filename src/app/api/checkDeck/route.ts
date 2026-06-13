@@ -62,13 +62,34 @@ export async function POST(request: Request) {
           include: { deck: { select: { name: true, ownerUserId: true } } },
         })
       : [];
+    // Each deck card badges the most specific collection rows it can:
+    // (name+set+foil) when the owner has that exact printing/finish, else
+    // (name+foil), else every row of the name. This keeps "only the foil copy
+    // is in the deck" accurate while degrading gracefully when the deck's
+    // recorded printing isn't one the owner actually has.
+    const keyExact = (userId: string, name: string, set: string, isFoil: boolean) =>
+      `${userId}:${normalizeCardName(name)}:${set.toLowerCase()}:${isFoil}`;
+    const keyFoil = (userId: string, name: string, isFoil: boolean) =>
+      `${userId}:${normalizeCardName(name)}:${isFoil}`;
+    const keyName = (userId: string, name: string) => `${userId}:${normalizeCardName(name)}`;
+
+    const ownedExact = new Set(matches.map((m) => keyExact(m.userId, m.cardName, m.set, m.isFoil)));
+    const ownedFoil = new Set(matches.map((m) => keyFoil(m.userId, m.cardName, m.isFoil)));
+
     const decksByOwnerCard = new Map<string, string[]>();
+    const addBadge = (key: string, deckName: string) => {
+      const list = decksByOwnerCard.get(key) ?? [];
+      if (!list.includes(deckName)) list.push(deckName);
+      decksByOwnerCard.set(key, list);
+    };
     for (const dc of deckCards) {
       if (!dc.deck.ownerUserId) continue;
-      const key = `${dc.deck.ownerUserId}:${normalizeCardName(dc.cardName)}`;
-      const list = decksByOwnerCard.get(key) ?? [];
-      if (!list.includes(dc.deck.name)) list.push(dc.deck.name);
-      decksByOwnerCard.set(key, list);
+      const owner = dc.deck.ownerUserId;
+      const exact = dc.set ? keyExact(owner, dc.cardName, dc.set, dc.isFoil) : null;
+      const foil = keyFoil(owner, dc.cardName, dc.isFoil);
+      if (exact && ownedExact.has(exact)) addBadge(exact, dc.deck.name);
+      else if (ownedFoil.has(foil)) addBadge(foil, dc.deck.name);
+      else addBadge(keyName(owner, dc.cardName), dc.deck.name);
     }
 
     // Group by card name, then by printing
@@ -89,12 +110,19 @@ export async function POST(request: Request) {
         };
       }
       
+      const decks = Array.from(
+        new Set([
+          ...(decksByOwnerCard.get(keyExact(match.userId, match.cardName, match.set, match.isFoil)) ?? []),
+          ...(decksByOwnerCard.get(keyFoil(match.userId, match.cardName, match.isFoil)) ?? []),
+          ...(decksByOwnerCard.get(keyName(match.userId, match.cardName)) ?? []),
+        ])
+      );
       grouped[match.cardName][printingKey].owners.push({
         name: match.user.name,
         quantity: match.quantity,
         condition: match.condition,
         isFoil: match.isFoil,
-        decks: decksByOwnerCard.get(`${match.userId}:${normalizeCardName(match.cardName)}`) ?? [],
+        decks,
       });
     }
 
