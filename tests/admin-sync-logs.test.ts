@@ -23,6 +23,11 @@ jest.mock('next/server', () => ({
   NextRequest: jest.fn(),
 }));
 
+const mockRequireAdmin = jest.fn();
+jest.mock('@/lib/session', () => ({
+  requireAdmin: (...args: any[]) => mockRequireAdmin(...args),
+}));
+
 import { GET } from '@/app/api/admin/users/[id]/sync-logs/route';
 
 function makeParams(id: string) {
@@ -32,8 +37,16 @@ function makeParams(id: string) {
 describe('GET /api/admin/users/[id]/sync-logs', () => {
   beforeEach(() => {
     mockSyncLogFindMany.mockClear();
+    mockRequireAdmin.mockResolvedValue({ ok: true, session: { userId: 'admin', role: 'ADMIN', isLegacyAdmin: false } });
     const { NextResponse } = jest.requireMock('next/server');
     NextResponse.json.mockClear();
+  });
+
+  it('returns 403 for a non-admin without querying', async () => {
+    mockRequireAdmin.mockResolvedValueOnce({ ok: false, response: { status: 403 } });
+    const result = await GET(undefined as never, makeParams('1'));
+    expect((result as any).status).toBe(403);
+    expect(mockSyncLogFindMany).not.toHaveBeenCalled();
   });
 
   it('returns merged and sorted logs: last 4 cron + last 1 manual', async () => {

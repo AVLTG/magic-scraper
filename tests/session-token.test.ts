@@ -37,4 +37,14 @@ describe('session tokens', () => {
       expect(await verifySessionToken(bad)).toBeNull()
     }
   })
+
+  it('rejects a signature that is not exactly 64 lowercase hex chars (no large allocation)', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600
+    const huge = 'a'.repeat(5_000_000) // would allocate ~2.5MB in hexToBytes if not pinned
+    const start = Date.now()
+    for (const badSig of [huge, 'abc', 'A'.repeat(64), 'g'.repeat(64), 'a'.repeat(63), 'a'.repeat(65)]) {
+      expect(await verifySessionToken(`v1.user_x.MEMBER.${future}.${badSig}`)).toBeNull()
+    }
+    expect(Date.now() - start).toBeLessThan(500) // rejected before any heavy work
+  })
 })

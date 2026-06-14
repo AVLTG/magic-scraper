@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { updateUserCollection } from '@/lib/updateCollections';
 import { sendDiscordAlert } from '@/lib/discord';
+import { requireAdmin } from '@/lib/session';
 
 export const maxDuration = 120;
 
@@ -8,6 +9,8 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
   const { id } = await params;
   const result = await updateUserCollection(id, 'manual');
   if (!result.success) {

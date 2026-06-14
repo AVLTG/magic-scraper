@@ -77,6 +77,10 @@ export async function verifySessionToken(value: string): Promise<SessionPayload 
     const [, userId, role, expStr, sig] = parts
     if (!userId || (role !== 'ADMIN' && role !== 'MEMBER')) return null
     if (!/^\d+$/.test(expStr)) return null
+    // Pin the signature to exactly 64 lowercase hex chars (HMAC-SHA256) BEFORE
+    // hexToBytes allocates — a huge/garbage sig would otherwise force a large
+    // ArrayBuffer allocation on every gated request (DoS vector).
+    if (!/^[0-9a-f]{64}$/.test(sig)) return null
     if (parseInt(expStr, 10) * 1000 < Date.now()) return null
     const base = `v1.${userId}.${role}.${expStr}`
     const key = await getKey()
