@@ -3,16 +3,10 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
-import {
-  parseMoxfieldText,
-  buildLibraryNameIndex,
-  normalizeCardName,
-  type ParsedMoxfieldCard,
-} from '@/lib/parseMoxfield';
+import { parseMoxfieldText, buildLibraryNameIndex, normalizeCardName, type ParsedMoxfieldCard } from '@/lib/parseMoxfield';
 import { classifyMoxfieldCards, resolveMissingToLibrary } from '@/lib/deckImport';
 
 const importSchema = z.object({
-  name: z.string().trim().min(1, 'name is required').max(100, 'name too long'),
   text: z.string().min(1).max(100_000),
   dryRun: z.boolean().default(false),
   addMissingToLibrary: z.boolean().optional(),
@@ -26,7 +20,10 @@ interface DeckCardDraft {
   isFoil: boolean;
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const rl = checkRateLimit(getIpKey(request), 10, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
@@ -37,14 +34,15 @@ export async function POST(request: Request) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (session.isLegacyAdmin) {
-      return NextResponse.json(
-        { error: 'Create your account via an invite to import decks' },
-        { status: 403 }
-      );
+
+    const { id } = await params;
+    const deck = await prisma.deck.findUnique({ where: { id } });
+    if (!deck) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (deck.ownerUserId === null || deck.ownerUserId !== session.userId) {
+      return NextResponse.json({ error: 'Only the deck owner can import cards' }, { status: 403 });
     }
 
-    const { name, text, dryRun, addMissingToLibrary } = importSchema.parse(await request.json());
+    const { text, dryRun, addMissingToLibrary } = importSchema.parse(await request.json());
 
     const { cards, errors } = parseMoxfieldText(text);
     const lib = await prisma.collectionCard.findMany({
@@ -62,7 +60,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // ---- commit ----
     if (missing.length > 0 && typeof addMissingToLibrary !== 'boolean') {
       return NextResponse.json(
         { error: 'addMissingToLibrary is required when cards are missing from your library' },
@@ -70,29 +67,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const mine = await prisma.deck.findMany({
-      where: { ownerUserId: session.userId },
-      select: { name: true },
-    });
-    if (mine.some((d) => d.name.trim().toLowerCase() === name.toLowerCase())) {
-      return NextResponse.json({ error: 'You already have a deck with that name' }, { status: 409 });
-    }
-
     // Merge duplicate names (different printings) — quantities sum, first printing wins.
-    const deckCardMap = new Map<string, DeckCardDraft>();
-
+    const drafts = new Map<string, DeckCardDraft>();
     const addDraft = (cardName: string, c: ParsedMoxfieldCard) => {
       const key = normalizeCardName(cardName);
-      const existing = deckCardMap.get(key);
+      const existing = drafts.get(key);
       if (existing) existing.quantity += c.quantity;
-      else deckCardMap.set(key, { cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil });
+      else drafts.set(key, { cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil });
     };
     for (const { card, canonical } of present) addDraft(canonical, card);
     for (const card of basics) addDraft(card.name, card);
 
     const libraryInserts: Array<Record<string, unknown>> = [];
     let excluded: string[] = [];
-
     if (missing.length > 0 && addMissingToLibrary) {
       const r = await resolveMissingToLibrary(missing, session.userId);
       if (!r.ok) {
@@ -107,32 +94,26 @@ export async function POST(request: Request) {
       excluded = missing.map((c) => c.name);
     }
 
-    const deck = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       if (libraryInserts.length > 0) {
         await tx.collectionCard.createMany({ data: libraryInserts as never });
       }
-      return tx.deck.create({
-        data: {
-          name,
-          ownerUserId: session.userId,
-          cards: { create: Array.from(deckCardMap.values()) },
-        },
-      });
+      for (const d of drafts.values()) {
+        await tx.deckCard.upsert({
+          where: { deckId_cardName: { deckId: id, cardName: d.cardName } },
+          update: { quantity: { increment: d.quantity } },
+          create: { deckId: id, cardName: d.cardName, quantity: d.quantity, set: d.set, collectorNumber: d.collectorNumber, isFoil: d.isFoil },
+        });
+      }
     });
 
-    // Total card count (summed quantities), consistent with GET /api/decks and
-    // the deck detail page — not the number of distinct rows.
-    const cardCount = Array.from(deckCardMap.values()).reduce((n, c) => n + c.quantity, 0);
-
-    return NextResponse.json(
-      {
-        deck: { id: deck.id, name: deck.name, cardCount },
-        addedToLibrary: libraryInserts.length,
-        excluded,
-        errors,
-      },
-      { status: 201 }
-    );
+    const updated = await prisma.deckCard.findMany({ where: { deckId: id }, orderBy: { cardName: 'asc' } });
+    return NextResponse.json({
+      cards: updated.map((c) => ({ cardName: c.cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil })),
+      addedToLibrary: libraryInserts.length,
+      excluded,
+      errors,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
@@ -140,7 +121,7 @@ export async function POST(request: Request) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    console.error('POST /api/decks/import error:', error);
-    return NextResponse.json({ error: 'Failed to import deck' }, { status: 500 });
+    console.error('POST /api/decks/[id]/import error:', error);
+    return NextResponse.json({ error: 'Failed to import cards' }, { status: 500 });
   }
 }

@@ -27,6 +27,12 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
   const [library, setLibrary] = useState<LibraryCard[]>([]);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importMissing, setImportMissing] = useState<{ cardName: string }[] | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
 
   const loadDeck = useCallback(async () => {
     const res = await fetch(`/api/decks/${id}`);
@@ -66,6 +72,51 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
     await loadDeck();
   };
 
+  const renameDeck = async () => {
+    const next = nameDraft.trim();
+    if (!next || next === deck?.name) { setEditingName(false); return; }
+    setError("");
+    const res = await fetch(`/api/decks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: next }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(typeof data.error === "string" ? data.error : "Failed to rename deck");
+      return;
+    }
+    setEditingName(false);
+    await loadDeck();
+  };
+
+  const runImport = async (body: Record<string, unknown>) => {
+    setImportBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/decks/${id}/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: importText, ...body }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const detail = Array.isArray(data.cards) ? `: ${data.cards.join(", ")}` : "";
+        setError(`${typeof data.error === "string" ? data.error : "Import failed"}${detail}`);
+        return;
+      }
+      if (body.dryRun) {
+        if (Array.isArray(data.missing) && data.missing.length > 0) setImportMissing(data.missing);
+        else await runImport({ dryRun: false, addMissingToLibrary: false });
+        return;
+      }
+      setShowImport(false); setImportText(""); setImportMissing(null);
+      await loadDeck();
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm(`Delete deck "${deck?.name}"? This cannot be undone.`)) return;
     const res = await fetch(`/api/decks/${id}`, { method: "DELETE" });
@@ -94,7 +145,28 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="py-8">
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-3xl">{deck.name}</h1>
+        {deck.isOwner && editingName ? (
+          <input
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); renameDeck(); }
+              if (e.key === "Escape") setEditingName(false);
+            }}
+            onBlur={renameDeck}
+            maxLength={100}
+            className="text-3xl bg-background border border-accent rounded px-2 py-0.5 text-foreground"
+          />
+        ) : (
+          <h1
+            className={`text-3xl ${deck.isOwner ? "cursor-pointer hover:text-accent" : ""}`}
+            onClick={() => { if (deck.isOwner) { setNameDraft(deck.name); setEditingName(true); } }}
+            title={deck.isOwner ? "Click to rename" : undefined}
+          >
+            {deck.name}
+          </h1>
+        )}
         {deck.isOwner && (
           <button onClick={handleDelete} className="text-sm text-red-400 hover:text-red-300 cursor-pointer">
             Delete deck
@@ -161,6 +233,53 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {deck.isOwner && (
+        <div className="rounded-lg border border-border bg-surface p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg">Moxfield Import</h2>
+            <button onClick={() => setShowImport((v) => !v)} className="text-sm text-accent hover:underline cursor-pointer">
+              {showImport ? "Cancel" : "Paste a list"}
+            </button>
+          </div>
+          {showImport && (
+            <div className="space-y-3">
+              <textarea
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                placeholder={"1 Sol Ring (C21) 263\n2 Treasure Vault (AFR) 261 *F*"}
+                className="w-full h-40 p-3 rounded-md border border-border bg-background text-foreground font-mono text-sm"
+              />
+              {importMissing === null ? (
+                <button
+                  onClick={() => runImport({ dryRun: true })}
+                  disabled={importBusy || importText.trim().length === 0}
+                  className="px-4 py-2 rounded-md bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-50 cursor-pointer"
+                >
+                  {importBusy ? "Checking…" : "Import"}
+                </button>
+              ) : (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+                  <p className="text-sm text-amber-400 font-medium">
+                    {importMissing.length} card{importMissing.length !== 1 ? "s are" : " is"} not in your library:
+                  </p>
+                  <pre className="text-xs text-foreground/80 max-h-40 overflow-auto whitespace-pre-wrap">
+                    {importMissing.map((m) => m.cardName).join("\n")}
+                  </pre>
+                  <div className="flex gap-2">
+                    <button onClick={() => runImport({ dryRun: false, addMissingToLibrary: true })} disabled={importBusy} className="px-3 py-1.5 rounded-md bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 cursor-pointer">
+                      Yes — add to library
+                    </button>
+                    <button onClick={() => runImport({ dryRun: false, addMissingToLibrary: false })} disabled={importBusy} className="px-3 py-1.5 rounded-md border border-border text-sm text-foreground hover:bg-surface-hover disabled:opacity-50 cursor-pointer">
+                      No — import without them
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

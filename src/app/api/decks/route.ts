@@ -34,7 +34,20 @@ export async function GET(request: Request) {
     const otherDecks = decks
       .filter((d) => d.ownerUserId !== session.userId)
       .map((d) => ({ id: d.id, name: d.name, cardCount: cardCount(d), ownerName: d.owner?.name ?? null }));
-    return NextResponse.json({ userDecks, otherDecks, isLegacyAdmin: session.isLegacyAdmin });
+    const byOwner = new Map<string, { ownerName: string; deckNames: string[] }>();
+    for (const d of decks) {
+      if (!d.ownerUserId) continue;
+      const ownerName = d.owner?.name ?? '';
+      const entry = byOwner.get(ownerName) ?? { ownerName, deckNames: [] };
+      entry.deckNames.push(d.name);
+      byOwner.set(ownerName, entry);
+    }
+    return NextResponse.json({
+      userDecks,
+      otherDecks,
+      decksByOwner: Array.from(byOwner.values()),
+      isLegacyAdmin: session.isLegacyAdmin,
+    });
   } catch (error) {
     console.error('GET /api/decks error:', error);
     return NextResponse.json({ error: 'Failed to fetch decks' }, { status: 500 });

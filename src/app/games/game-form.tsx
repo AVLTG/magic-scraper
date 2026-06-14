@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useMemo, FormEvent } from 'react';
 import { Combobox } from '@/app/components/combobox';
 import { tieredDeckItems } from '@/lib/deckTiers';
 import type { GameVariant, ParticipantRole } from '@/lib/validators';
@@ -75,6 +75,19 @@ export function excludeItemsForRow(
     .map((r, i) => ({ row: r, i }))
     .filter((entry) => entry.i !== rowIndex && !entry.row.isRandom && entry.row.playerName.trim().length > 0)
     .map((entry) => entry.row.playerName.trim());
+}
+
+export function deckGroupsForRow(
+  playerName: string,
+  decksByOwner: { ownerName: string; deckNames: string[] }[],
+  allDeckNames: string[],
+  input: string
+) {
+  const key = playerName.trim().toLowerCase();
+  const owned = decksByOwner.find((o) => o.ownerName.trim().toLowerCase() === key)?.deckNames ?? [];
+  const ownedSet = new Set(owned.map((d) => d.toLowerCase()));
+  const others = allDeckNames.filter((d) => !ownedSet.has(d.toLowerCase()));
+  return tieredDeckItems(owned, others, input);
 }
 
 /**
@@ -322,6 +335,7 @@ export function GameForm({
   const [playerItems, setPlayerItems] = useState<string[]>([]);
   const [userDeckNames, setUserDeckNames] = useState<string[]>([]);
   const [otherDeckNames, setOtherDeckNames] = useState<string[]>([]);
+  const [decksByOwner, setDecksByOwner] = useState<{ ownerName: string; deckNames: string[] }[]>([]);
   const [errors, setErrors] = useState<GameFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
@@ -347,6 +361,7 @@ export function GameForm({
           setOtherDeckNames(
             Array.isArray(data.otherDecks) ? data.otherDecks.map((d: { name: string }) => d.name) : []
           );
+          setDecksByOwner(Array.isArray(data.decksByOwner) ? data.decksByOwner : []);
         }
       } catch (err) {
         console.error('Failed to seed autocomplete:', err);
@@ -356,6 +371,11 @@ export function GameForm({
       cancelled = true;
     };
   }, []);
+
+  const allDeckNames = useMemo(
+    () => [...userDeckNames, ...otherDeckNames],
+    [userDeckNames, otherDeckNames]
+  );
 
   const updateRow = (i: number, patch: Partial<ParticipantRow>) => {
     setState((s) => ({
@@ -514,7 +534,7 @@ export function GameForm({
               excludeLabel="Player already in game"
             />
             <Combobox
-              groups={tieredDeckItems(userDeckNames, otherDeckNames, r.deckName)}
+              groups={deckGroupsForRow(r.playerName, decksByOwner, allDeckNames, r.deckName)}
               value={r.deckName}
               onChange={(v) => updateRow(i, { deckName: v })}
               placeholder="Deck (optional)"

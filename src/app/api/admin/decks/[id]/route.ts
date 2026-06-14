@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { matchDeckParticipants } from '@/lib/reconcile';
 
 const assignSchema = z.object({ ownerUserId: z.string().min(1).nullable() });
 
@@ -46,5 +47,47 @@ export async function PATCH(
     }
     console.error('PATCH /api/admin/decks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to update deck owner' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const rl = checkRateLimit(getIpKey(request), 20, 60000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } }
+    );
+  }
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (session.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
+    const { id } = await params;
+    const deck = await prisma.deck.findUnique({ where: { id } });
+    if (!deck) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const parts = await prisma.gameParticipant.findMany({
+      where: { deckName: { not: null } },
+      select: { id: true, gameId: true, deckName: true },
+    });
+    const { ids, gameCount } = matchDeckParticipants(parts, deck.name);
+
+    await prisma.$transaction(async (tx) => {
+      if (ids.length > 0) {
+        await tx.gameParticipant.updateMany({ where: { id: { in: ids } }, data: { deckName: null } });
+      }
+      await tx.deck.delete({ where: { id } });
+    });
+
+    return NextResponse.json({ success: true, detachedGames: gameCount });
+  } catch (error) {
+    console.error('DELETE /api/admin/decks/[id] error:', error);
+    return NextResponse.json({ error: 'Failed to delete deck' }, { status: 500 });
   }
 }

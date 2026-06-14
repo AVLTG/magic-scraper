@@ -1,7 +1,7 @@
 import { groupSections, filterItems, shouldShowAddNew } from '@/app/components/combobox'
 
 const groups = [
-  { label: 'User decks', items: ['Krenko Goblins', 'Esper Control'] },
+  { label: 'Owned decks', items: ['Krenko Goblins', 'Esper Control'] },
   { label: 'Borrowed decks', items: ['Slivers'] },
 ]
 
@@ -19,7 +19,7 @@ describe('groupSections', () => {
   it('drops empty groups and keeps offsets contiguous', () => {
     const sections = groupSections(groups, '', undefined)
     expect(sections).toEqual([
-      { label: 'User decks', items: ['Krenko Goblins', 'Esper Control'], start: 0 },
+      { label: 'Owned decks', items: ['Krenko Goblins', 'Esper Control'], start: 0 },
       { label: 'Borrowed decks', items: ['Slivers'], start: 2 },
     ])
   })

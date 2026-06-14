@@ -4,14 +4,14 @@ const userDecks = ['Krenko Goblins', 'Esper Control']
 const otherDecks = ['Esper', 'Slivers', 'Krenko Goblins'] // 'Krenko Goblins' also owned by another user
 
 describe('tieredDeckItems', () => {
-  it('shows ONLY the User decks tier when the search matches user decks', () => {
+  it('shows ONLY the Owned decks tier when the search matches user decks', () => {
     expect(tieredDeckItems(userDecks, otherDecks, 'kren')).toEqual([
-      { label: 'User decks', items: ['Krenko Goblins', 'Esper Control'] },
+      { label: 'Owned decks', items: ['Krenko Goblins', 'Esper Control'] },
     ])
   })
 
   it('shows user decks on empty input when the user has decks', () => {
-    expect(tieredDeckItems(userDecks, otherDecks, '')[0].label).toBe('User decks')
+    expect(tieredDeckItems(userDecks, otherDecks, '')[0].label).toBe('Owned decks')
   })
 
   it('falls back to Borrowed decks only when no user deck matches', () => {

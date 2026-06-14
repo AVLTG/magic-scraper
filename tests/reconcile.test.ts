@@ -1,4 +1,5 @@
 import { computeUnlinkedDecks, computeUnlinkedPlayers, normalizeName } from '@/lib/reconcile'
+import { matchDeckParticipants } from '@/lib/reconcile'
 
 const P = (gameId: string, playerName: string, deckName: string | null, isRandom = false) => ({
   gameId,
@@ -44,5 +45,19 @@ describe('computeUnlinkedPlayers', () => {
 describe('normalizeName', () => {
   it('trims and lowercases', () => {
     expect(normalizeName('  Foo Bar ')).toBe('foo bar')
+  })
+})
+
+describe('matchDeckParticipants', () => {
+  const P = (id: string, gameId: string, deckName: string | null) => ({ id, gameId, deckName })
+
+  it('returns ids whose deckName matches (case/space-insensitive) and the distinct game count', () => {
+    const parts = [P('a', 'g1', 'Anikthea'), P('b', 'g1', 'anikthea '), P('c', 'g2', 'ANIKTHEA'), P('d', 'g3', 'Goblins')]
+    expect(matchDeckParticipants(parts, 'anikthea')).toEqual({ ids: ['a', 'b', 'c'], gameCount: 2 })
+  })
+
+  it('skips null deckNames and returns empty when nothing matches', () => {
+    const parts = [P('a', 'g1', null), P('b', 'g2', 'Goblins')]
+    expect(matchDeckParticipants(parts, 'Slivers')).toEqual({ ids: [], gameCount: 0 })
   })
 })

@@ -60,3 +60,15 @@ export function computeUnlinkedPlayers(
     userNames
   )
 }
+
+// Match game participants whose deckName equals `name` (normalized). Used by the
+// deck rename + admin-delete flows to rewrite or detach the deckName string in
+// game history. Pure — the caller fetches participants and runs the updateMany.
+export function matchDeckParticipants(
+  participants: Array<{ id: string; gameId: string; deckName: string | null }>,
+  name: string
+): { ids: string[]; gameCount: number } {
+  const key = normalizeName(name)
+  const matched = participants.filter((p) => p.deckName != null && normalizeName(p.deckName) === key)
+  return { ids: matched.map((p) => p.id), gameCount: new Set(matched.map((p) => p.gameId)).size }
+}

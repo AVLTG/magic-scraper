@@ -8,6 +8,7 @@ interface AdminDeck {
   ownerUserId: string | null;
   ownerName: string | null;
   cardCount: number;
+  gameCount: number;
 }
 interface AdminUser { id: string; name: string }
 
@@ -55,6 +56,21 @@ export default function DecksSection() {
     );
   };
 
+  const remove = async (deck: AdminDeck) => {
+    const msg =
+      deck.gameCount > 0
+        ? `Delete "${deck.name}"? It is used in ${deck.gameCount} game${deck.gameCount === 1 ? "" : "s"} — deleting removes it from them (player names unchanged).`
+        : `Delete "${deck.name}"?`;
+    if (!confirm(msg)) return;
+    setStatus("");
+    const res = await fetch(`/api/admin/decks/${deck.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setStatus("Failed to delete deck");
+      return;
+    }
+    setDecks((ds) => ds.filter((d) => d.id !== deck.id));
+  };
+
   return (
     <section className="mt-10">
       <h2 className="text-xl mb-1">Decks</h2>
@@ -72,17 +88,26 @@ export default function DecksSection() {
                 <span className="font-medium">{deck.name}</span>
                 <span className="text-xs text-muted ml-2">{deck.cardCount} cards</span>
               </div>
-              <select
-                value={deck.ownerUserId ?? ""}
-                onChange={(e) => assign(deck.id, e.target.value === "" ? null : e.target.value)}
-                className="px-2 py-1 rounded-md border border-border bg-surface text-foreground text-sm"
-                aria-label={`Owner of ${deck.name}`}
-              >
-                <option value="">Unassigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={deck.ownerUserId ?? ""}
+                  onChange={(e) => assign(deck.id, e.target.value === "" ? null : e.target.value)}
+                  className="px-2 py-1 rounded-md border border-border bg-surface text-foreground text-sm"
+                  aria-label={`Owner of ${deck.name}`}
+                >
+                  <option value="">Unassigned</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => remove(deck)}
+                  className="px-2 py-1 rounded-md text-xs text-red-400 hover:bg-destructive/10 cursor-pointer"
+                  aria-label={`Delete ${deck.name}`}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>

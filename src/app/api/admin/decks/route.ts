@@ -22,6 +22,17 @@ export async function GET(request: Request) {
       include: { owner: { select: { name: true } }, cards: { select: { quantity: true } } },
       orderBy: { name: 'asc' },
     });
+    const participants = await prisma.gameParticipant.findMany({
+      where: { deckName: { not: null } },
+      select: { gameId: true, deckName: true },
+    });
+    const gamesByDeck = new Map<string, Set<string>>();
+    for (const p of participants) {
+      if (!p.deckName) continue;
+      const key = p.deckName.trim().toLowerCase();
+      if (!gamesByDeck.has(key)) gamesByDeck.set(key, new Set());
+      gamesByDeck.get(key)!.add(p.gameId);
+    }
     return NextResponse.json({
       decks: decks.map((d) => ({
         id: d.id,
@@ -30,6 +41,7 @@ export async function GET(request: Request) {
         ownerName: d.owner?.name ?? null,
         // Total card count (summed quantities), consistent with the deck pages.
         cardCount: d.cards.reduce((n, c) => n + c.quantity, 0),
+        gameCount: gamesByDeck.get(d.name.trim().toLowerCase())?.size ?? 0,
       })),
     });
   } catch (error) {
