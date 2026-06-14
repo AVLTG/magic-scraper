@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import InvitesSection from "./invites-section";
 import DecksSection from "./decks-section";
+import UnlinkedDecksSection from "./unlinked-decks-section";
+import UnlinkedPlayersSection from "./unlinked-players-section";
 
 function StatusDot({ status }: { status: "success" | "failure" | "unknown" }) {
   const color =
@@ -382,6 +384,12 @@ export default function AdminPage() {
 
       {/* Decks section */}
       <DecksSection />
+
+      {/* Unlinked game decks */}
+      <UnlinkedDecksSection />
+
+      {/* Unregistered players */}
+      <UnlinkedPlayersSection />
 
       {/* Update All Collections section */}
       <div className="rounded-lg border border-border bg-surface p-6">
