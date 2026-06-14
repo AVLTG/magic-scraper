@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, FormEvent } from 'react';
 import { Combobox } from '@/app/components/combobox';
+import { tieredDeckItems } from '@/lib/deckTiers';
 import type { GameVariant, ParticipantRole } from '@/lib/validators';
 import { BEST_OF_FORMATS, maxComboWinsFor, isSingleWinnerVariant } from '@/lib/gameFormats';
 
@@ -319,7 +320,8 @@ export function GameForm({
     }
   );
   const [playerItems, setPlayerItems] = useState<string[]>([]);
-  const [deckItems, setDeckItems] = useState<string[]>([]);
+  const [userDeckNames, setUserDeckNames] = useState<string[]>([]);
+  const [otherDeckNames, setOtherDeckNames] = useState<string[]>([]);
   const [errors, setErrors] = useState<GameFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
@@ -339,7 +341,12 @@ export function GameForm({
         }
         if (dRes.ok) {
           const data = await dRes.json();
-          setDeckItems(Array.isArray(data.decks) ? data.decks : []);
+          setUserDeckNames(
+            Array.isArray(data.userDecks) ? data.userDecks.map((d: { name: string }) => d.name) : []
+          );
+          setOtherDeckNames(
+            Array.isArray(data.otherDecks) ? data.otherDecks.map((d: { name: string }) => d.name) : []
+          );
         }
       } catch (err) {
         console.error('Failed to seed autocomplete:', err);
@@ -507,7 +514,7 @@ export function GameForm({
               excludeLabel="Player already in game"
             />
             <Combobox
-              items={deckItems}
+              groups={tieredDeckItems(userDeckNames, otherDeckNames, r.deckName)}
               value={r.deckName}
               onChange={(v) => updateRow(i, { deckName: v })}
               placeholder="Deck (optional)"

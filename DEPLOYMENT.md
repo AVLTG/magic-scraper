@@ -18,6 +18,7 @@ tabletally is an MTG collection checker for friend groups. It lets any member of
 10. [Post-Deploy Verification](#post-deploy-verification)
 11. [Seed Users](#seed-users)
 12. [Troubleshooting](#troubleshooting)
+13. [Develop / Staging Environment](#develop--staging-environment)
 
 ---
 
@@ -57,8 +58,8 @@ Minimum values needed for local dev (use your Turso dev database URLs or a local
 DATABASE_URL=libsql://your-db-name-your-org.turso.io
 DATABASE_AUTH_TOKEN=eyJhbGc...
 COOKIE_SECRET=<64 hex chars — generate with: openssl rand -hex 32>
-GROUP_PASSWORD=any-password
 ADMIN_PASSWORD=any-admin-password
+ALLOW_LEGACY_LOGIN=true
 CRON_SECRET=<64 hex chars — generate with: openssl rand -hex 32>
 CHROMIUM_REMOTE_EXEC_PATH=https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar
 ```
@@ -74,7 +75,7 @@ npx prisma db push
 npm run dev
 ```
 
-Visit `http://localhost:3000/login` and enter the group password to verify the app is running.
+Visit `http://localhost:3000/login` and sign in with a user account — or, while `ALLOW_LEGACY_LOGIN=true`, leave the username blank and enter `ADMIN_PASSWORD` (legacy bootstrap).
 
 > **Note for local scraping:** The Chromium binary is downloaded from `CHROMIUM_REMOTE_EXEC_PATH` at runtime during scraping. This requires an internet connection and may be slow on first use.
 
@@ -125,8 +126,9 @@ Apply them to **Production** at minimum. Optionally also set them for Preview an
 | `DATABASE_URL` | Turso database URL | `turso db show <name> --url` | `libsql://tabletally-myorg.turso.io` |
 | `DATABASE_AUTH_TOKEN` | Turso auth token (full access) | `turso db tokens create <name>` | `eyJhbGciOiJFZERTQSJ9...` |
 | `COOKIE_SECRET` | HMAC key for session cookies — must be 32+ bytes | `openssl rand -hex 32` | `a1b2c3d4...` (64 hex chars) |
-| `GROUP_PASSWORD` | Shared password all group members use to log in | Choose any string | `our-mtg-group-2024` |
-| `ADMIN_PASSWORD` | Password for the admin panel (`/admin`) | Choose a strong string | `admin-strong-pass-xyz` |
+| `ADMIN_PASSWORD` | Legacy bootstrap password — only works while `ALLOW_LEGACY_LOGIN=true` (see User accounts migration below) | Choose a strong string | `admin-strong-pass-xyz` |
+| `ALLOW_LEGACY_LOGIN` | Enables the legacy admin-password login during the user-accounts migration window | `true` / unset | `true` |
+| `APP_URL` | Canonical site origin used in generated invite links (falls back to the request origin) | Your production URL | `https://tabletally.example.com` |
 | `CRON_SECRET` | Bearer token Vercel sends with cron requests — must match server check | `openssl rand -hex 32` | `f9e8d7c6...` (64 hex chars) |
 | `CHROMIUM_REMOTE_EXEC_PATH` | URL to the chromium-min binary tarball used for browser scraping | Copy from releases page | `https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar` |
 
@@ -223,7 +225,7 @@ On first deploy:
 Run through this checklist after your first deploy:
 
 - [ ] Visit `https://<your-app>.vercel.app/login` — login page loads
-- [ ] Enter the group password — redirected to the main page
+- [ ] Sign in with a user account (or the legacy admin bootstrap) — redirected to the main page
 - [ ] Enter the admin password — redirected to `/admin` with admin access
 - [ ] Admin panel shows an "Update All Collections" button
 - [ ] Click "Update All Collections" — sync runs and returns without error (may take 10-60 seconds per user)
@@ -272,7 +274,7 @@ The `COLLECTION_ID` is the alphanumeric string at the end of the URL. Copy that 
 - Check the user list for a duplicate and remove the old entry first
 
 **Login not working (group or admin password rejected)**
-- Verify `GROUP_PASSWORD` and `ADMIN_PASSWORD` are set correctly in Vercel env vars
+- Verify `ADMIN_PASSWORD` (and `ALLOW_LEGACY_LOGIN`, during the migration window) are set correctly in Vercel env vars
 - Verify `COOKIE_SECRET` is set — without it, session cookies cannot be signed and auth will fail
 - After changing env vars, redeploy (Vercel does not hot-reload env changes)
 
@@ -283,3 +285,105 @@ The `COLLECTION_ID` is the alphanumeric string at the end of the URL. Copy that 
 **Build fails with Prisma errors**
 - Run `npx prisma generate` locally and commit any generated files if needed
 - Ensure `DATABASE_URL` is set in Vercel env vars before the build runs
+
+---
+
+## Develop / Staging Environment
+
+The `develop` branch auto-deploys to a Vercel Preview at
+`https://magic-scraper-git-develop-avltgs-projects.vercel.app` — an isolated
+staging mirror for in-progress work (issue #5 + its sub-issues) that never
+touches production:
+
+- **Database**: a fork of prod, `tabletally-dev`
+  (`turso db create tabletally-dev --from-db tabletally`). Branch-scoped
+  `DATABASE_URL` / `DATABASE_AUTH_TOKEN` Preview env vars point `develop` at the
+  fork, so migrations run on `develop` never alter production data.
+- **Secrets**: `COOKIE_SECRET`, `ADMIN_PASSWORD`, `CRON_SECRET`
+  are inherited from the shared Preview scope (same login as prod).
+- **Discord**: disabled on `develop` (placeholder `DISCORD_WEBHOOK_URL`) so test
+  games don't post to the real channel.
+- **Cron**: Vercel Cron runs on **production only** — `develop` does not
+  nightly-sync. Use the admin "Update Collections" button to refresh
+  `tabletally-dev` on demand.
+
+Every push to `develop` triggers a fresh preview build. To reset the staging
+data back to a copy of production, drop and re-fork:
+`turso db destroy tabletally-dev && turso db create tabletally-dev --from-db tabletally`
+(then re-mint the token and update the branch-scoped `DATABASE_AUTH_TOKEN`).
+
+---
+
+## User Accounts Migration (issue #6)
+
+Shared group-password auth is replaced by per-user accounts created only via
+admin invites. `GROUP_PASSWORD` is retired entirely; `ADMIN_PASSWORD` survives
+only as an env-gated bootstrap.
+
+### Rollout order (staging first, then production)
+
+1. Apply the schema (adds nullable auth columns on `users` + the `invites`
+   table; existing users/collections are preserved):
+   ```bash
+   DATABASE_URL="libsql://..." DATABASE_AUTH_TOKEN="..." npx prisma db push
+   ```
+2. Set `ALLOW_LEGACY_LOGIN=true` (and optionally `APP_URL`) in Vercel env vars
+   and deploy the branch.
+3. Log in with the legacy admin password — **leave the username field blank**
+   on `/login` and enter `ADMIN_PASSWORD`.
+4. In **/admin → Invites**: create a *bound* invite for your own collection
+   user with **Admin account** checked, click **Open now (self-assign)**, and
+   set your password. You now have a real ADMIN account.
+5. Send invites to the group (bound invites for existing collection users —
+   their username is locked to a slug of their name; open invites for anyone
+   else). The group password no longer works anywhere.
+6. Once everyone has an account: set `ALLOW_LEGACY_LOGIN=false` (or delete the
+   var) and redeploy. `GROUP_PASSWORD` can be deleted; keep `ADMIN_PASSWORD`
+   only if you may need to re-bootstrap.
+
+### Notes
+
+- Passwords are hashed with scrypt (`node:crypto`) in Node API routes only —
+  the Edge middleware never touches password hashing.
+- Sessions are HMAC-signed `session` cookies carrying `userId` + `role`; the
+  old `admin_session` cookie is gone (middleware checks `role === 'ADMIN'`).
+  Everyone is logged out once after deploy (old cookie format is rejected).
+- Invite links are single-use, expire after 7 days by default (max 30), and
+  are shown exactly once at creation — only a SHA-256 hash is stored.
+- Revoking an invite hard-deletes it (no audit trail) — accepted tradeoff for
+  a private app.
+- Nightly sync skips login-only users with no `moxfieldCollectionId`.
+- Password reset: no self-service flow — delete the user's `username`/
+  `passwordHash` … or simpler, have the admin create a new *bound* invite once
+  the username is cleared. (Tracked as future work.)
+
+---
+
+## Decks & Card Library Migration (issue #7)
+
+One additive migration (`add_decks_and_card_library`) plus a one-time backfill script.
+No new environment variables — Scryfall's API is keyless.
+
+1. **Apply the migration** (same Turso procedure as issue #6 — prisma's CLI rejects
+   libsql URLs, so generate SQL and pipe it through the Turso shell):
+   ```bash
+   npx prisma migrate diff --from-url "file:./prod-snapshot.db" \
+     --to-schema-datamodel prisma/schema.prisma --script > /tmp/decks-migration.sql
+   # review the SQL, then:
+   turso db shell tabletally < /tmp/decks-migration.sql
+   ```
+   The migration is additive (new `decks`/`deck_cards` tables, new
+   `collection_cards.source` column defaulting to `'moxfield'`) — no data loss.
+
+2. **Run the legacy deck backfill** (idempotent; creates a Deck per distinct
+   historical deckName, owned by the user who played it most). Run it with
+   `node` — Node ≥22.18 strips the TypeScript natively (the script's `.ts`
+   import extensions are deliberate for this); `npx tsx ...` works too:
+   ```bash
+   DATABASE_URL="libsql://<db>.turso.io" DATABASE_AUTH_TOKEN="<token>" \
+     node src/scripts/backfillDecks.ts
+   ```
+   Review the printed deck→owner table; fix stragglers in Admin → Decks.
+
+3. Nightly sync now only replaces `source='moxfield'` rows — manually added
+   library cards survive automatically.

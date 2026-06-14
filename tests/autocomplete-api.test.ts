@@ -1,6 +1,10 @@
 /**
- * Integration tests for /api/players and /api/decks route handlers
+ * Integration tests for /api/players route handler
  * Mocks prisma, rateLimit, and next/server
+ *
+ * NOTE: The old /api/decks GET (distinct GameParticipant deckNames) was removed
+ * in the user-decks-library feature. Those tests lived here and are deleted.
+ * The new /api/decks GET returns tiered {userDecks, otherDecks} — see decks-api.test.ts.
  */
 
 const mockUserFindMany: jest.Mock = jest.fn();
@@ -32,7 +36,6 @@ jest.mock('next/server', () => ({
 }));
 
 import { GET as getPlayers } from '../src/app/api/players/route';
-import { GET as getDecks } from '../src/app/api/decks/route';
 
 function makeRequest(): Request {
   return {
@@ -107,61 +110,3 @@ describe('GET /api/players', () => {
   });
 });
 
-describe('GET /api/decks', () => {
-  beforeEach(() => {
-    mockParticipantFindMany.mockReset();
-    mockCheckRateLimit.mockReset();
-    mockCheckRateLimit.mockReturnValue({ allowed: true });
-  });
-
-  it('returns distinct non-null deckNames sorted', async () => {
-    mockParticipantFindMany.mockResolvedValue([
-      { deckName: 'Edric' },
-      { deckName: 'Atraxa' },
-      { deckName: 'Edric' },
-    ]);
-    const res: any = await getDecks(makeRequest());
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ decks: ['Atraxa', 'Edric'] });
-  });
-
-  it('filters null deckNames out', async () => {
-    mockParticipantFindMany.mockResolvedValue([{ deckName: null }, { deckName: 'Edric' }]);
-    const res: any = await getDecks(makeRequest());
-    expect(res.body).toEqual({ decks: ['Edric'] });
-  });
-
-  it('returns empty array when no games', async () => {
-    mockParticipantFindMany.mockResolvedValue([]);
-    const res: any = await getDecks(makeRequest());
-    expect(res.body).toEqual({ decks: [] });
-  });
-
-  it('returns 429 when rate limited', async () => {
-    mockCheckRateLimit.mockReturnValue({ allowed: false, retryAfterSeconds: 10 });
-    const res: any = await getDecks(makeRequest());
-    expect(res.status).toBe(429);
-    expect(res.headers['Retry-After']).toBe('10');
-  });
-
-  it('calls checkRateLimit with (ip, 30, 60000)', async () => {
-    mockParticipantFindMany.mockResolvedValue([]);
-    await getDecks(makeRequest());
-    expect(mockCheckRateLimit).toHaveBeenCalledWith('test-ip', 30, 60000);
-  });
-
-  it('returns 500 on DB error', async () => {
-    mockParticipantFindMany.mockRejectedValue(new Error('db down'));
-    const res: any = await getDecks(makeRequest());
-    expect(res.status).toBe(500);
-    expect(res.body).toEqual({ error: 'Failed to fetch decks' });
-  });
-
-  it('excludes random participants from the deck list', async () => {
-    mockParticipantFindMany.mockResolvedValue([{ deckName: 'Atraxa' }, { deckName: 'Selvala' }]);
-    const res: any = await getDecks(makeRequest());
-    expect(res.status).toBe(200);
-    const callArg = mockParticipantFindMany.mock.calls[0][0];
-    expect(callArg.where).toEqual(expect.objectContaining({ isRandom: false }));
-  });
-});

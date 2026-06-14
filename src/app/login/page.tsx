@@ -9,6 +9,7 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const message = searchParams.get("message")
 
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -22,14 +23,16 @@ function LoginContent() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username: username.trim() || undefined, password }),
       })
 
-      if (res.ok) {
-        const data = await res.json()
+      const data = await res.json().catch(() => null)
+      if (res.ok && data) {
         router.push(data.redirect || "/")
       } else if (res.status === 401) {
-        setError("Incorrect password. Try again.")
+        setError("Invalid username or password.")
+      } else if (res.status === 429) {
+        setError(data?.error ?? "Too many attempts — try again shortly.")
       } else {
         setError("Something went wrong. Please try again.")
       }
@@ -59,19 +62,37 @@ function LoginContent() {
             TableTally
           </h1>
           <p className="text-sm text-muted mb-6">
-            Enter group password to continue
+            Sign in with your account
           </p>
 
           <form onSubmit={handleSubmit}>
             <div>
-              <label className="text-sm font-medium text-foreground mb-1.5 block">
+              <label htmlFor="login-username" className="text-sm font-medium text-foreground mb-1.5 block">
+                Username
+              </label>
+              <input
+                id="login-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="your-username"
+                autoComplete="username"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="mt-4">
+              <label htmlFor="login-password" className="text-sm font-medium text-foreground mb-1.5 block">
                 Password
               </label>
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                autoComplete="current-password"
                 className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
                 disabled={isLoading}
               />
@@ -88,6 +109,10 @@ function LoginContent() {
             {error && (
               <p className="mt-3 text-sm font-medium text-red-400">{error}</p>
             )}
+
+            <p className="mt-4 text-xs text-muted">
+              No account? Ask the admin for an invite link.
+            </p>
           </form>
         </div>
       </div>

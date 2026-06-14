@@ -44,6 +44,9 @@ Friends can instantly see who in the group owns any card from a decklist, and ch
 - [ ] Admin can view sync history / last-updated timestamps per user
 - [ ] Error alerting when nightly cron sync fails
 - [ ] Scraper health dashboard with logging
+- [ ] Self-service password reset — no flow today; admin manually clears credentials + issues a new bound invite (#6 follow-up)
+- [ ] Password change for logged-in users (account settings page) (#6 follow-up)
+- [ ] Per-user decks & card library (#7) — Deck/DeckCard models, /decks + /library pages, tiered games dropdown, Moxfield plaintext import (in progress on `feature/user-decks-library`)
 
 ## Current Milestone: v1.1 Game Tracking & Polish
 
@@ -57,8 +60,8 @@ Friends can instantly see who in the group owns any card from a decklist, and ch
 
 ### Out of Scope
 
-- Individual user accounts/logins — shared password is sufficient for a closed friend group
-- Public access or sign-up flow — invite-only by design
+- ~~Individual user accounts/logins~~ — superseded by #5/#6: per-user accounts via admin invites (in progress on `feature/user-accounts`)
+- Public access or sign-up flow — invite-only by design (admin invites only; no public sign-up)
 - Mobile app — web-only is fine
 - Real-time price updates — nightly sync is sufficient
 - Price history tracking — not needed for this use case
@@ -93,6 +96,9 @@ Friends can instantly see who in the group owns any card from a decklist, and ch
 | prisma db push (not migrate deploy) | Turso incompatible with migrate deploy | ⚠️ Revisit — track Prisma/Turso support |
 | Collection update in Prisma transaction | Prevents partial data loss during deleteMany + createMany | ✓ Good — atomic operations |
 | maxDuration=300 on cron route | Fluid Compute budget for multi-user sync | ✓ Good — sufficient for current user count |
+| Per-user accounts via admin invites (#6) | Per-user decks/library (#5) need identity; shared password retired via env-gated legacy bootstrap (`ALLOW_LEGACY_LOGIN`) | — in progress on `feature/user-accounts` |
+| Decks store cards by value, not FK (#7) | Nightly sync deletes+recreates CollectionCard rows; FKs would orphan daily | — in progress |
+| CollectionCard.source column for manual adds (#7) | One library source of truth; sync only replaces source='moxfield' | — in progress |
 
 ## Evolution
 

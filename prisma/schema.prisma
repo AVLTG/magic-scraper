@@ -11,10 +11,17 @@ datasource db {
 model User {
   id                    String            @id @default(cuid())
   name                  String
-  moxfieldCollectionId  String            @unique
+  moxfieldCollectionId  String?           @unique
   lastUpdated           DateTime          @default(now())
+  username              String?           @unique
+  passwordHash          String?
+  role                  String            @default("MEMBER")
+  createdAt             DateTime          @default(now())
   collectionCards       CollectionCard[]
   syncLogs              SyncLog[]
+  invitesCreated        Invite[]          @relation("InviteCreator")
+  invitesTargeting      Invite[]          @relation("InviteTarget")
+  decks                 Deck[]
 
   @@map("users")
 }
@@ -30,6 +37,7 @@ model CollectionCard {
   condition   String
   isFoil      Boolean
   typeLine    String
+  source      String   @default("moxfield")
   lastUpdated DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -85,4 +93,52 @@ model SyncLog {
 
   @@index([userId, createdAt])
   @@map("sync_logs")
+}
+
+model Invite {
+  id                String    @id @default(cuid())
+  tokenHash         String    @unique
+  targetUserId      String?
+  suggestedUsername String?
+  role              String    @default("MEMBER")
+  createdByUserId   String?
+  usedAt            DateTime?
+  expiresAt         DateTime
+  createdAt         DateTime  @default(now())
+
+  targetUser User? @relation("InviteTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  createdBy  User? @relation("InviteCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([targetUserId])
+  @@index([createdAt])
+  @@map("invites")
+}
+
+model Deck {
+  id          String   @id @default(cuid())
+  ownerUserId String?
+  name        String
+  createdAt   DateTime @default(now())
+
+  owner User?      @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  cards DeckCard[]
+
+  @@index([ownerUserId])
+  @@map("decks")
+}
+
+model DeckCard {
+  id              String  @id @default(cuid())
+  deckId          String
+  cardName        String
+  quantity        Int     @default(1)
+  set             String?
+  collectorNumber String?
+  isFoil          Boolean @default(false)
+
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, cardName])
+  @@index([cardName])
+  @@map("deck_cards")
 }

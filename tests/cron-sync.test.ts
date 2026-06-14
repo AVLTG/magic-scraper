@@ -109,3 +109,54 @@ describe('cron sync route', () => {
     expect(response.status).toBe(500)
   })
 })
+
+describe('cron sync environment gating (production-only)', () => {
+  const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV
+
+  beforeEach(() => {
+    mockUpdateAll.mockClear()
+    mockSendDiscord.mockClear()
+    mockUpdateAll.mockResolvedValue({ succeeded: ['Alice'], failed: [] })
+    mockSendDiscord.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV
+    else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV
+  })
+
+  it('skips the sync on preview/staging — no scrape, no Discord, no tokens burned', async () => {
+    process.env.VERCEL_ENV = 'preview'
+    const req = makeCronRequest('Bearer test-cron-secret-123')
+    const response = await GET(req)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body).toMatchObject({ skipped: true })
+    expect(mockUpdateAll).not.toHaveBeenCalled()
+    expect(mockSendDiscord).not.toHaveBeenCalled()
+  })
+
+  it('runs the sync when VERCEL_ENV is production', async () => {
+    process.env.VERCEL_ENV = 'production'
+    const req = makeCronRequest('Bearer test-cron-secret-123')
+    const response = await GET(req)
+    expect(response.status).toBe(200)
+    expect(mockUpdateAll).toHaveBeenCalledWith('cron')
+  })
+
+  it('runs the sync locally when VERCEL_ENV is unset', async () => {
+    delete process.env.VERCEL_ENV
+    const req = makeCronRequest('Bearer test-cron-secret-123')
+    const response = await GET(req)
+    expect(response.status).toBe(200)
+    expect(mockUpdateAll).toHaveBeenCalledWith('cron')
+  })
+
+  it('still enforces auth before the environment check on preview', async () => {
+    process.env.VERCEL_ENV = 'preview'
+    const req = makeCronRequest('Bearer wrong-token')
+    const response = await GET(req)
+    expect(response.status).toBe(401)
+    expect(mockUpdateAll).not.toHaveBeenCalled()
+  })
+})

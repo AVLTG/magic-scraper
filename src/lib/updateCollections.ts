@@ -5,7 +5,10 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
   succeeded: string[];
   failed: Array<{ name: string; error: string }>;
 }> {
-  const users = await prisma.user.findMany();
+  // Login-only accounts may have no Moxfield collection — sync skips them
+  const users = await prisma.user.findMany({
+    where: { moxfieldCollectionId: { not: null } },
+  });
 
   console.log(`Starting update for ${users.length} users...`);
   console.log('Users:', users.map(u => ({ name: u.name, id: u.moxfieldCollectionId })));
@@ -15,8 +18,10 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
 
   for (let i = 0; i < users.length; i++) {
     const user = users[i];
+    const collectionId = user.moxfieldCollectionId;
+    if (!collectionId) continue; // narrowed out by the query; satisfies the nullable type
     console.log(`\n=== Updating collection for ${user.name} (${i + 1}/${users.length}) ===`);
-    console.log('Collection ID:', user.moxfieldCollectionId);
+    console.log('Collection ID:', collectionId);
 
     // Delay between users to avoid Moxfield rate-limiting
     if (i > 0) {
@@ -25,7 +30,7 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
 
     try {
       const cards = await scrapeMoxfield({
-        collectionId: user.moxfieldCollectionId
+        collectionId
       });
 
       console.log(`Scraped ${cards.length} cards for ${user.name}`);
@@ -50,7 +55,7 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
       // Atomic: all three operations commit together or none do
       await prisma.$transaction(async (tx) => {
         const deleteResult = await tx.collectionCard.deleteMany({
-          where: { userId: user.id }
+          where: { userId: user.id, source: 'moxfield' }
         });
         console.log(`Deleted ${deleteResult.count} old cards`);
 
@@ -65,6 +70,7 @@ export async function updateAllCollections(source: 'cron' | 'manual' = 'cron'): 
             condition: card.condition,
             isFoil: card.isFoil,
             typeLine: card.type_line,
+            source: 'moxfield',
           }))
         });
         console.log(`Inserted ${createResult.count} new cards`);
@@ -121,12 +127,16 @@ export async function updateUserCollection(
 ): Promise<{ success: boolean; error?: string; userName?: string }> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return { success: false, error: 'User not found' };
+  const collectionId = user.moxfieldCollectionId;
+  if (!collectionId) {
+    return { success: false, error: 'User has no Moxfield collection', userName: user.name };
+  }
 
   console.log(`=== Updating collection for ${user.name} ===`);
-  console.log('Collection ID:', user.moxfieldCollectionId);
+  console.log('Collection ID:', collectionId);
 
   try {
-    const cards = await scrapeMoxfield({ collectionId: user.moxfieldCollectionId });
+    const cards = await scrapeMoxfield({ collectionId });
     console.log(`Scraped ${cards.length} cards for ${user.name}`);
 
     if (cards.length === 0) {
@@ -142,7 +152,7 @@ export async function updateUserCollection(
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.collectionCard.deleteMany({ where: { userId: user.id } });
+      await tx.collectionCard.deleteMany({ where: { userId: user.id, source: 'moxfield' } });
       await tx.collectionCard.createMany({
         data: cards.map(card => ({
           userId: user.id,
@@ -154,6 +164,7 @@ export async function updateUserCollection(
           condition: card.condition,
           isFoil: card.isFoil,
           typeLine: card.type_line,
+          source: 'moxfield',
         })),
       });
       await tx.user.update({ where: { id: user.id }, data: { lastUpdated: new Date() } });

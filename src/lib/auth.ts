@@ -5,7 +5,6 @@ const SECRET = process.env.COOKIE_SECRET!
 
 export const COOKIE_NAMES = {
   session: 'session',
-  adminSession: 'admin_session',
 } as const
 
 export const COOKIE_OPTIONS = {
@@ -16,14 +15,19 @@ export const COOKIE_OPTIONS = {
   maxAge: 60 * 60 * 24 * 30, // 30 days
 }
 
+let cachedKey: CryptoKey | null = null
+
 async function getKey(): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
+  if (!SECRET) throw new Error('COOKIE_SECRET env var is not set')
+  if (cachedKey) return cachedKey
+  cachedKey = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(SECRET),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign', 'verify']
   )
+  return cachedKey
 }
 
 function bytesToHex(buf: ArrayBuffer): string {
@@ -41,17 +45,48 @@ function hexToBytes(hex: string): ArrayBuffer {
   return buf
 }
 
-export async function signCookie(cookieName: string): Promise<string> {
-  const key = await getKey()
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(cookieName))
-  return bytesToHex(sig)
+export type SessionRole = 'ADMIN' | 'MEMBER'
+export interface SessionPayload {
+  userId: string
+  role: SessionRole
 }
 
-export async function verifyHmac(value: string, cookieName: string): Promise<boolean> {
+// Sentinel for the env-gated legacy bootstrap login (no DB row backs it)
+export const LEGACY_ADMIN_USER_ID = '__legacy_admin__'
+
+// Token format: v1.<userId>.<role>.<expUnixSeconds>.<hexHmac>
+// userId is a cuid / sentinel (no dots), so '.' is a safe delimiter.
+export async function createSessionToken(
+  userId: string,
+  role: SessionRole,
+  maxAgeSeconds: number = COOKIE_OPTIONS.maxAge
+): Promise<string> {
+  // '.' is the payload delimiter — a dotted userId would produce an unverifiable token
+  if (!userId || userId.includes('.')) throw new Error('userId must be non-empty and must not contain "."')
+  const exp = Math.floor(Date.now() / 1000) + maxAgeSeconds
+  const base = `v1.${userId}.${role}.${exp}`
+  const key = await getKey()
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(base))
+  return `${base}.${bytesToHex(sig)}`
+}
+
+export async function verifySessionToken(value: string): Promise<SessionPayload | null> {
   try {
+    const parts = value.split('.')
+    if (parts.length !== 5 || parts[0] !== 'v1') return null
+    const [, userId, role, expStr, sig] = parts
+    if (!userId || (role !== 'ADMIN' && role !== 'MEMBER')) return null
+    if (!/^\d+$/.test(expStr)) return null
+    // Pin the signature to exactly 64 lowercase hex chars (HMAC-SHA256) BEFORE
+    // hexToBytes allocates — a huge/garbage sig would otherwise force a large
+    // ArrayBuffer allocation on every gated request (DoS vector).
+    if (!/^[0-9a-f]{64}$/.test(sig)) return null
+    if (parseInt(expStr, 10) * 1000 < Date.now()) return null
+    const base = `v1.${userId}.${role}.${expStr}`
     const key = await getKey()
-    return crypto.subtle.verify('HMAC', key, hexToBytes(value), new TextEncoder().encode(cookieName))
+    const ok = await crypto.subtle.verify('HMAC', key, hexToBytes(sig), new TextEncoder().encode(base))
+    return ok ? { userId, role } : null
   } catch {
-    return false
+    return null
   }
 }

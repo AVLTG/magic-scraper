@@ -29,8 +29,20 @@ jest.mock('next/server', () => ({
   NextRequest: jest.fn(),
 }));
 
+const mockRequireAdmin = jest.fn();
+jest.mock('@/lib/session', () => ({
+  requireAdmin: (...args: any[]) => mockRequireAdmin(...args),
+}));
+
 import { GET, POST } from '@/app/api/admin/users/route';
 import { DELETE, PATCH } from '@/app/api/admin/users/[id]/route';
+
+const ADMIN_OK = { ok: true, session: { userId: 'admin', role: 'ADMIN', isLegacyAdmin: false } };
+
+beforeEach(() => {
+  // Default: an authenticated admin. Individual tests override to exercise 401/403.
+  mockRequireAdmin.mockResolvedValue(ADMIN_OK);
+});
 
 function makeRequest(body?: object): any {
   return {
@@ -52,11 +64,19 @@ describe('GET /api/admin/users', () => {
     const result = await GET();
 
     expect(mockFindMany).toHaveBeenCalledWith({
-      select: { id: true, name: true, moxfieldCollectionId: true },
+      select: { id: true, name: true, moxfieldCollectionId: true, username: true, role: true },
       orderBy: { name: 'asc' },
     });
     expect((result as any).status).toBe(200);
     expect((result as any).body).toEqual(mockUsers);
+  });
+
+  it('GET returns 401 with no session and 403 for a non-admin, without querying', async () => {
+    mockRequireAdmin.mockResolvedValueOnce({ ok: false, response: { status: 401 } });
+    expect(((await GET()) as any).status).toBe(401);
+    mockRequireAdmin.mockResolvedValueOnce({ ok: false, response: { status: 403 } });
+    expect(((await GET()) as any).status).toBe(403);
+    expect(mockFindMany).not.toHaveBeenCalled();
   });
 });
 
@@ -108,6 +128,13 @@ describe('POST /api/admin/users', () => {
     expect((result as any).status).toBe(409);
     expect((result as any).body.error).toMatch(/already exists/);
   });
+
+  it('POST returns 403 for a non-admin without creating', async () => {
+    mockRequireAdmin.mockResolvedValueOnce({ ok: false, response: { status: 403 } });
+    const result = await POST(makeRequest({ name: 'Bob', moxfieldCollectionId: 'def' }));
+    expect((result as any).status).toBe(403);
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
 });
 
 describe('DELETE /api/admin/users/[id]', () => {
@@ -133,6 +160,13 @@ describe('DELETE /api/admin/users/[id]', () => {
 
     expect((result as any).status).toBe(404);
     expect((result as any).body).toEqual({ error: 'User not found' });
+  });
+
+  it('DELETE returns 403 for a non-admin without deleting', async () => {
+    mockRequireAdmin.mockResolvedValueOnce({ ok: false, response: { status: 403 } });
+    const result = await DELETE(makeRequest(), { params: Promise.resolve({ id: '1' }) });
+    expect((result as any).status).toBe(403);
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 });
 
