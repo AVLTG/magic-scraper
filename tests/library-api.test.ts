@@ -66,6 +66,49 @@ describe('GET /api/library', () => {
     )
   })
 
+  it('badges each printing only with the decks that reference that exact printing', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    mockCollectionFindMany.mockResolvedValue([
+      { id: 'c1', cardName: 'Arcane Signet', set: 'arc', setName: 'Arcane', quantity: 1, condition: 'NearMint', isFoil: false, typeLine: 'Artifact', source: 'moxfield' },
+      { id: 'c2', cardName: 'Arcane Signet', set: 'eld', setName: 'Eldraine', quantity: 1, condition: 'NearMint', isFoil: false, typeLine: 'Artifact', source: 'moxfield' },
+    ])
+    mockDeckFindMany.mockResolvedValue([
+      { id: 'd1', name: 'Deck A', cards: [{ cardName: 'Arcane Signet', set: 'arc', isFoil: false }] },
+      { id: 'd2', name: 'Deck B', cards: [{ cardName: 'Arcane Signet', set: 'eld', isFoil: false }] },
+    ])
+    const res: any = await GET(makeRequest())
+    const byId = Object.fromEntries(res.body.cards.map((c: any) => [c.id, c.decks]))
+    expect(byId.c1).toEqual([{ id: 'd1', name: 'Deck A' }])
+    expect(byId.c2).toEqual([{ id: 'd2', name: 'Deck B' }])
+  })
+
+  it('badges only the matching finish when the user owns foil and non-foil of one printing', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    mockCollectionFindMany.mockResolvedValue([
+      { id: 'c1', cardName: 'Greater Tanuki', set: 'neo', setName: 'Kamigawa', quantity: 1, condition: 'NearMint', isFoil: true, typeLine: 'Creature', source: 'moxfield' },
+      { id: 'c2', cardName: 'Greater Tanuki', set: 'neo', setName: 'Kamigawa', quantity: 1, condition: 'NearMint', isFoil: false, typeLine: 'Creature', source: 'moxfield' },
+    ])
+    mockDeckFindMany.mockResolvedValue([
+      { id: 'd1', name: 'Anikthea', cards: [{ cardName: 'Greater Tanuki', set: 'neo', isFoil: true }] },
+    ])
+    const res: any = await GET(makeRequest())
+    const byId = Object.fromEntries(res.body.cards.map((c: any) => [c.id, c.decks]))
+    expect(byId.c1).toEqual([{ id: 'd1', name: 'Anikthea' }])
+    expect(byId.c2).toEqual([])
+  })
+
+  it('falls back to name matching when a deck card has no recorded printing', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    mockCollectionFindMany.mockResolvedValue([
+      { id: 'c1', cardName: 'Sol Ring', set: 'c21', setName: 'Commander 2021', quantity: 1, condition: 'NearMint', isFoil: false, typeLine: 'Artifact', source: 'moxfield' },
+    ])
+    mockDeckFindMany.mockResolvedValue([
+      { id: 'd1', name: 'Krenko', cards: [{ cardName: 'SOL RING', set: null, isFoil: false }] },
+    ])
+    const res: any = await GET(makeRequest())
+    expect(res.body.cards[0].decks).toEqual([{ id: 'd1', name: 'Krenko' }])
+  })
+
   it('returns empty cards + flag for the legacy admin', async () => {
     mockGetSession.mockResolvedValue(LEGACY)
     const res: any = await GET(makeRequest())
