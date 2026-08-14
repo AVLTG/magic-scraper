@@ -523,23 +523,30 @@ export function GameForm({
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-foreground">Participants</legend>
         {state.rows.map((r, i) => (
-          <div key={i} className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 items-center">
-            <Combobox
-              items={playerItems}
-              value={r.playerName}
-              onChange={(v) => updateRow(i, { playerName: v })}
-              placeholder={`Player ${i + 1}`}
-              addLabel="player"
-              excludeItems={excludeItemsForRow(i, state)}
-              excludeLabel="Player already in game"
-            />
-            <Combobox
-              groups={deckGroupsForRow(r.playerName, decksByOwner, allDeckNames, r.deckName)}
-              value={r.deckName}
-              onChange={(v) => updateRow(i, { deckName: v })}
-              placeholder="Deck (optional)"
-              addLabel="deck"
-            />
+          <div
+            key={i}
+            className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-center rounded-md border border-border p-2 sm:border-0 sm:p-0"
+          >
+            <div className="col-span-2 sm:col-span-1">
+              <Combobox
+                items={playerItems}
+                value={r.playerName}
+                onChange={(v) => updateRow(i, { playerName: v })}
+                placeholder={`Player ${i + 1}`}
+                addLabel="player"
+                excludeItems={excludeItemsForRow(i, state)}
+                excludeLabel="Player already in game"
+              />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <Combobox
+                groups={deckGroupsForRow(r.playerName, decksByOwner, allDeckNames, r.deckName)}
+                value={r.deckName}
+                onChange={(v) => updateRow(i, { deckName: v })}
+                placeholder="Deck (optional)"
+                addLabel="deck"
+              />
+            </div>
             {isSingleWinnerVariant(state.variant) && (
               <label className="flex items-center gap-1 text-xs text-muted">
                 <input
@@ -623,7 +630,7 @@ export function GameForm({
               </label>
             </div>
             {errors.rows?.[i] && (
-              <p className="col-span-4 text-xs text-red-600">{errors.rows[i]}</p>
+              <p className="col-span-2 sm:col-span-4 text-xs text-red-600">{errors.rows[i]}</p>
             )}
           </div>
         ))}
