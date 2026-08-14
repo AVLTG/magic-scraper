@@ -208,7 +208,7 @@ export function Combobox({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-surface shadow-lg"
+          className="absolute z-10 mt-1 w-full max-h-60 overflow-auto overscroll-contain rounded-md border border-border bg-surface shadow-lg [-webkit-overflow-scrolling:touch]"
         >
           {(sections ?? [{ label: '', items: filtered, start: 0 }]).map((section) => (
             <Fragment key={section.label || '__flat__'}>
@@ -228,12 +228,17 @@ export function Combobox({
                     id={`${listboxId}-opt-${i}`}
                     role="option"
                     aria-selected={highlightedIndex === i}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      commit(item);
-                    }}
+                    // Commit on click (tap-up), not mousedown (press-down): committing on
+                    // press-down makes the list impossible to drag-scroll on touch — the
+                    // first option your finger lands on selects and closes. onClick only
+                    // fires on a genuine tap, so a scroll gesture no longer mis-selects.
+                    // The no-op mousedown preventDefault preserves the desktop behaviour
+                    // the combobox was originally built around (keep input focused, no
+                    // blur-before-click flicker) — see 06-02-combobox-component-SUMMARY.md.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => commit(item)}
                     onMouseEnter={() => setHighlightedIndex(i)}
-                    className={`px-3 py-2 cursor-pointer ${
+                    className={`px-3 py-2.5 min-h-[44px] flex items-center cursor-pointer touch-manipulation ${
                       highlightedIndex === i ? 'bg-accent-muted text-accent' : 'text-foreground hover:bg-surface-hover'
                     }`}
                   >
@@ -249,12 +254,10 @@ export function Combobox({
               id={`${listboxId}-opt-${addNewIndex}`}
               role="option"
               aria-selected={highlightedIndex === addNewIndex}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                commit(inputValue.trim());
-              }}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => commit(inputValue.trim())}
               onMouseEnter={() => setHighlightedIndex(addNewIndex)}
-              className={`px-3 py-2 cursor-pointer border-t border-border italic ${
+              className={`px-3 py-2.5 min-h-[44px] flex items-center cursor-pointer touch-manipulation border-t border-border italic ${
                 highlightedIndex === addNewIndex ? 'bg-accent-muted text-accent' : 'text-muted hover:bg-surface-hover'
               }`}
             >
@@ -268,8 +271,8 @@ export function Combobox({
               role="option"
               aria-disabled="true"
               aria-selected={false}
-              // No onMouseDown — non-clickable per D-12
-              className="px-3 py-2 border-t border-border italic text-muted opacity-60 cursor-not-allowed select-none"
+              // No onMouseDown/onClick — non-clickable per D-12
+              className="px-3 py-2.5 min-h-[44px] flex items-center border-t border-border italic text-muted opacity-60 cursor-not-allowed select-none"
             >
               {excludeLabel}
             </li>
