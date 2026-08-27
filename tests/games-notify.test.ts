@@ -5,6 +5,7 @@
 
 const mockGameFindUnique = jest.fn();
 const mockGameUpdate = jest.fn();
+const mockGameUpdateMany = jest.fn();
 const mockSendDiscordAlert = jest.fn();
 const mockCheckRateLimit = jest.fn();
 const mockGetIpKey = jest.fn((..._args: unknown[]) => 'test-ip');
@@ -14,6 +15,7 @@ jest.mock('@/lib/prisma', () => ({
     game: {
       findUnique: (...args: unknown[]) => mockGameFindUnique(...args),
       update: (...args: unknown[]) => mockGameUpdate(...args),
+      updateMany: (...args: unknown[]) => mockGameUpdateMany(...args),
     },
   },
 }));
@@ -97,6 +99,8 @@ describe('POST /api/games/[id]/notify', () => {
     jest.clearAllMocks();
     mockCheckRateLimit.mockReturnValue({ allowed: true });
     mockGameUpdate.mockResolvedValue({ ...baseGame, discordNotified: true });
+    mockGameUpdateMany.mockResolvedValue({ count: 1 });
+    mockSendDiscordAlert.mockResolvedValue(true);
   });
 
   it('returns 404 when game not found', async () => {
@@ -110,8 +114,9 @@ describe('POST /api/games/[id]/notify', () => {
     expect(mockGameUpdate).not.toHaveBeenCalled();
   });
 
-  it('returns 409 when game already notified', async () => {
+  it('returns 409 when the notify claim loses (already notified) without sending', async () => {
     mockGameFindUnique.mockResolvedValue({ ...baseGame, discordNotified: true });
+    mockGameUpdateMany.mockResolvedValue({ count: 0 });
 
     const res: any = await POST(makeRequest(), makeParams('g1'));
 
@@ -132,10 +137,38 @@ describe('POST /api/games/[id]/notify', () => {
       content:
         'New Commander game added! Alice won using Atraxa via combo. Check it out at http://localhost:3000/games',
     });
-    expect(mockGameUpdate).toHaveBeenCalledWith({
-      where: { id: 'g1' },
+    expect(mockGameUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'g1', discordNotified: false },
       data: { discordNotified: true },
     });
+  });
+
+  it('returns 502 and releases the claim when Discord delivery fails (retry stays possible)', async () => {
+    mockGameFindUnique.mockResolvedValue({ ...baseGame });
+    mockSendDiscordAlert.mockResolvedValueOnce(false);
+
+    const res: any = await POST(makeRequest(), makeParams('g1'));
+
+    expect(res.status).toBe(502);
+    expect(res.body).toEqual({ error: 'Failed to send Discord notification' });
+    // The flag is rolled back so the user can retry once the webhook works.
+    expect(mockGameUpdate).toHaveBeenCalledWith({
+      where: { id: 'g1' },
+      data: { discordNotified: false },
+    });
+  });
+
+  it('does not double-send on concurrent requests (claim is compare-and-set)', async () => {
+    mockGameFindUnique.mockResolvedValue({ ...baseGame });
+    mockGameUpdateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+
+    await POST(makeRequest(), makeParams('g1'));
+    const second: any = await POST(makeRequest(), makeParams('g1'));
+
+    expect(second.status).toBe(409);
+    expect(mockSendDiscordAlert).toHaveBeenCalledTimes(1);
   });
 
   it('uses fallback deck text "a deck they forgot to list" when winner has no deckName', async () => {

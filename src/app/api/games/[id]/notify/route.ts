@@ -51,11 +51,32 @@ export async function POST(
       origin
     );
 
-    await sendDiscordAlert({ content: message });
-    await prisma.game.update({
-      where: { id },
+    // Claim the notify flag atomically (compare-and-set) so two concurrent
+    // clicks can't both pass the read check above and double-send.
+    const claim = await prisma.game.updateMany({
+      where: { id, discordNotified: false },
       data: { discordNotified: true },
     });
+    if (claim.count === 0) {
+      return NextResponse.json(
+        { error: 'Notification already sent' },
+        { status: 409 }
+      );
+    }
+
+    const sent = await sendDiscordAlert({ content: message });
+    if (!sent) {
+      // Delivery failed — release the claim so the user can actually retry
+      // instead of hitting a permanent 409 with nothing ever posted.
+      await prisma.game.update({
+        where: { id },
+        data: { discordNotified: false },
+      });
+      return NextResponse.json(
+        { error: 'Failed to send Discord notification' },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
