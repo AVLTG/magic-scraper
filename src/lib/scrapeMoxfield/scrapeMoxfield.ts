@@ -89,9 +89,12 @@ export async function scrapeMoxfield({
     console.log(`  Got ${pageCards.length} cards from page ${pageNumber}`);
     allCards = allCards.concat(pageCards);
 
-    if (pageCards.length < pageSize || Object.keys(apiData.data).length === 0) {
-      hasMorePages = false;
-    } else {
+    // "Full page" must be judged on the RAW key count, before basics/tokens
+    // are filtered — otherwise any full page containing a basic land looks
+    // like a short page and the collection is silently truncated at page 1.
+    const rawCount = Object.keys(apiData.data).length;
+    hasMorePages = rawCount >= pageSize;
+    if (hasMorePages) {
       pageNumber++;
     }
   }
