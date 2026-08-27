@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { parseDeckList } from '@/lib/parseDeck';
 import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { normalizeCardName } from '@/lib/parseMoxfield';
+import { getSession } from '@/lib/session';
+
+// Cap matches the other paste endpoints (decks/import: 100k) — an unbounded
+// decklist feeds a line-by-line parse and an IN clause sized by the input.
+const checkDeckSchema = z.object({ decklist: z.string().min(1).max(100_000) });
 
 export async function POST(request: Request) {
   const rl = checkRateLimit(routeKey(request, 'checkdeck:post'), 10, 60000);
@@ -13,14 +19,10 @@ export async function POST(request: Request) {
     );
   }
   try {
-    const { decklist } = await request.json();
-    
-    if (!decklist || typeof decklist !== 'string') {
-      return NextResponse.json(
-        { error: 'Decklist is required' },
-        { status: 400 }
-      );
-    }
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { decklist } = checkDeckSchema.parse(await request.json());
 
     const parsedCards = parseDeckList(decklist);
     // Collections store MDFCs Scryfall-style ("A // B"); Moxfield exports use
@@ -139,6 +141,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ results });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Decklist is required and must be at most 100,000 characters' },
+        { status: 400 }
+      );
+    }
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
     console.error('Deck check error:', error);
     return NextResponse.json(
       { error: 'Failed to check deck' },

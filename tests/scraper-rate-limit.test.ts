@@ -44,6 +44,9 @@ jest.mock('@/lib/scrapeLGS/scrapeAllSites', () => ({
   scrapeAllSites: (...args: any[]) => mockScrapeAllSites(...args),
 }));
 
+const mockGetSession = jest.fn();
+jest.mock('@/lib/session', () => ({ getSession: (...args: any[]) => mockGetSession(...args) }));
+
 jest.mock('@/lib/scrapeLGS/lgsCache', () => ({
   getCached: (...args: any[]) => mockGetCached(...args),
   setCache: (...args: any[]) => mockSetCache(...args),
@@ -77,6 +80,7 @@ function makeRequest(body?: unknown): Request {
 describe('POST /api/checkDeck rate limiting', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetSession.mockResolvedValue({ userId: 'u1', role: 'MEMBER', isLegacyAdmin: false });
   });
 
   it('calls checkRateLimit with (ip, 10, 60000) before any DB work', async () => {
@@ -108,6 +112,23 @@ describe('POST /api/checkDeck rate limiting', () => {
     );
     expect(res.status).toBe(200);
     expect(mockFindMany).toHaveBeenCalled();
+  });
+
+  it('401s without a session, before touching prisma', async () => {
+    mockCheckRateLimit.mockReturnValue({ allowed: true });
+    mockGetSession.mockResolvedValueOnce(null);
+    const res: any = await checkDeckPost(makeRequest({ decklist: '1 Lightning Bolt' }));
+    expect(res.status).toBe(401);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it('400s a decklist over 100k characters instead of parsing it', async () => {
+    mockCheckRateLimit.mockReturnValue({ allowed: true });
+    const res: any = await checkDeckPost(
+      makeRequest({ decklist: 'x'.repeat(100_001) })
+    );
+    expect(res.status).toBe(400);
+    expect(mockFindMany).not.toHaveBeenCalled();
   });
 });
 

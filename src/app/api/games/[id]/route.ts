@@ -137,6 +137,9 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
     if (isPrismaNotFound(error)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }

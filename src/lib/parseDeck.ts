@@ -8,8 +8,18 @@ export function parseDeckList(decklistText: string): DeckCard[] {
   const cards: DeckCard[] = [];
 
   for (const line of lines) {
-    const trimmed = line.trim();
+    let trimmed = line.trim();
     if (!trimmed) continue;
+
+    // MTGO exports prefix sideboard lines with "SB:" — unwrap so the
+    // quantity+name parse below still applies ("SB: 2 Duress" → 2 Duress).
+    trimmed = trimmed.replace(/^SB:\s*/i, '');
+
+    // Bare section headers from Arena/MTGO exports ("Deck", "Sideboard",
+    // "Commander") are not cards — skip instead of emitting a phantom 1-of.
+    if (/^(deck|sideboard|maindeck|main board|commander|companion)$/i.test(trimmed)) {
+      continue;
+    }
 
     let quantity = 1;
     let name = trimmed;
