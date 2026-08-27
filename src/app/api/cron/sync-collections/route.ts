@@ -1,13 +1,24 @@
 import type { NextRequest } from 'next/server'
+import { timingSafeEqual } from 'node:crypto'
 import { updateAllCollections } from '@/lib/updateCollections'
 import { sendDiscordAlert } from '@/lib/discord'
 
 export const maxDuration = 300
 
+// Constant-time Bearer check. An unset CRON_SECRET must fail closed — a naive
+// template-literal compare would accept the literal "Bearer undefined".
+function isAuthorizedCron(authHeader: string | null): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret || !authHeader) return false
+  const expected = Buffer.from(`Bearer ${secret}`)
+  const actual = Buffer.from(authHeader)
+  return expected.length === actual.length && timingSafeEqual(expected, actual)
+}
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
 
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCron(authHeader)) {
     return new Response('Unauthorized', { status: 401 })
   }
 

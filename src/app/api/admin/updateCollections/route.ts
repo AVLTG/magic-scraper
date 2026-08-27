@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { updateAllCollections } from '@/lib/updateCollections';
 import { sendDiscordAlert } from '@/lib/discord';
+import { requireAdmin } from '@/lib/session';
 
 export const maxDuration = 300;
 
 export async function POST() {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+
   try {
     const { succeeded, failed } = await updateAllCollections('manual');
     if (failed.length > 0) {
