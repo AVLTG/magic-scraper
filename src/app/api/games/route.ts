@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { gameCreateSchema } from '@/lib/validators';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { ensureDecksForParticipants } from '@/lib/deckAutoCreate';
 
 export async function POST(request: Request) {
-  const rl = checkRateLimit(getIpKey(request), 30, 60000);
+  const rl = checkRateLimit(routeKey(request, 'games:post'), 30, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const rl = checkRateLimit(getIpKey(request), 30, 60000);
+  const rl = checkRateLimit(routeKey(request, 'games:get'), 30, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },

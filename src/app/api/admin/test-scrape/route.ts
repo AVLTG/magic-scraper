@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { requireAdmin } from "@/lib/session";
-import { checkRateLimit, getIpKey } from "@/lib/rateLimit";
+import { checkRateLimit, routeKey } from "@/lib/rateLimit";
 
 const execFileAsync = promisify(execFile);
 
@@ -32,7 +32,7 @@ async function fetchMoxfield(targetUrl: string): Promise<{ method: string; body:
 export async function GET(request: Request) {
   // Each call makes a real outbound scrape (ScraperAPI credits or a curl
   // subprocess) — throttle on its own bucket, not the shared per-IP one.
-  const rl = checkRateLimit(`test-scrape:${getIpKey(request)}`, 5, 60000);
+  const rl = checkRateLimit(routeKey(request, 'test-scrape'), 5, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Rate limit exceeded" },

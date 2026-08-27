@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { matchDeckParticipants } from '@/lib/reconcile';
 
 const assignSchema = z.object({ ownerUserId: z.string().min(1).nullable() });
@@ -11,7 +11,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const rl = checkRateLimit(getIpKey(request), 20, 60000);
+  const rl = checkRateLimit(routeKey(request, 'admin-decks-id:patch'), 20, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
@@ -54,7 +54,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const rl = checkRateLimit(getIpKey(request), 20, 60000);
+  const rl = checkRateLimit(routeKey(request, 'admin-decks-id:delete'), 20, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },

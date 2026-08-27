@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { parseMoxfieldText, isBasicLand, type ParsedMoxfieldCard } from '@/lib/parseMoxfield';
 import { resolveCards, scryfallKey } from '@/lib/scryfall';
 
 const bodySchema = z.object({ text: z.string().min(1).max(50_000) });
 
 export async function POST(request: Request) {
-  const rl = checkRateLimit(getIpKey(request), 10, 60000);
+  const rl = checkRateLimit(routeKey(request, 'library-cards:post'), 10, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },

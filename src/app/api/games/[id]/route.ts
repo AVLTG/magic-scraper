@@ -7,7 +7,7 @@ import {
   GAME_VARIANTS,
   type GameVariant,
 } from '@/lib/validators';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { ensureDecksForParticipants } from '@/lib/deckAutoCreate';
 
 // Prisma "Record not found" error code for update/delete on missing row
@@ -30,7 +30,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const rl = checkRateLimit(getIpKey(request), 30, 60000);
+  const rl = checkRateLimit(routeKey(request, 'games-id:get'), 30, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
@@ -63,7 +63,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const rl = checkRateLimit(getIpKey(request), 30, 60000);
+  const rl = checkRateLimit(routeKey(request, 'games-id:patch'), 30, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
@@ -152,7 +152,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const rl = checkRateLimit(getIpKey(request), 30, 60000);
+  const rl = checkRateLimit(routeKey(request, 'games-id:delete'), 30, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },

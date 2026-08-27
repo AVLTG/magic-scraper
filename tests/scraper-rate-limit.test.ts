@@ -15,6 +15,7 @@ const mockSetCache = jest.fn();
 
 jest.mock('@/lib/rateLimit', () => ({
   checkRateLimit: (...args: any[]) => mockCheckRateLimit(...args),
+  routeKey: (request: any, route: string) => `${route}:${mockGetIpKey(request)}`,
   getIpKey: (...args: any[]) => mockGetIpKey(...args),
 }));
 
@@ -82,7 +83,7 @@ describe('POST /api/checkDeck rate limiting', () => {
     mockCheckRateLimit.mockReturnValue({ allowed: true });
     mockFindMany.mockResolvedValue([]);
     await checkDeckPost(makeRequest({ decklist: '1 Lightning Bolt' }));
-    expect(mockCheckRateLimit).toHaveBeenCalledWith('test-ip', 10, 60000);
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('checkdeck:post:test-ip', 10, 60000);
   });
 
   it('returns 429 with Retry-After when rate limited and does NOT call prisma', async () => {
@@ -136,6 +137,6 @@ describe('POST /api/scrapeLGS rate limiting', () => {
       retryAfterSeconds: 1,
     });
     await scrapeLGSPost(makeRequest({ card: 'Lightning Bolt' }));
-    expect(mockCheckRateLimit).toHaveBeenCalledWith('test-ip', 10, 60000);
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('scrapelgs:post:test-ip', 10, 60000);
   });
 });

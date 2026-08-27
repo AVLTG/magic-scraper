@@ -38,3 +38,12 @@ export function getIpKey(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
   return forwarded?.split(',')[0]?.trim() ?? 'unknown';
 }
+
+// Route-scoped bucket key. Every handler MUST scope its bucket with a route
+// prefix: a bare per-IP key is shared by ~20 endpoints with limits from 10 to
+// 30, so browse-heavy GETs exhaust the bucket and block unrelated low-limit
+// writes (e.g. POST /api/decks) with spurious 429s. The auth routes already
+// followed this shape (`login:${ip}`) — this makes it uniform.
+export function routeKey(request: Request, route: string): string {
+  return `${route}:${getIpKey(request)}`;
+}

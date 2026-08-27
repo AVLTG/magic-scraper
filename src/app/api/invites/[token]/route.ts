@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashInviteToken, inviteStatus } from '@/lib/invites'
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit'
+import { checkRateLimit, routeKey } from '@/lib/rateLimit'
 
 // Public preflight for the redeem page: never reveals more than validity + locked username.
 export async function GET(
@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ token: string }> }
 ) {
   // Unauthenticated + one DB hit per call — throttle junk-token spraying
-  const rate = checkRateLimit(`invite-preflight:${getIpKey(request)}`, 30, 60_000)
+  const rate = checkRateLimit(routeKey(request, 'invite-preflight'), 30, 60_000)
   if (!rate.allowed) {
     return NextResponse.json(
       { error: 'Too many attempts — try again shortly' },

@@ -6,7 +6,7 @@ import { createSessionToken, COOKIE_OPTIONS, COOKIE_NAMES } from '@/lib/auth'
 import { hashPassword } from '@/lib/password'
 import { validatePassword, usernameSchema } from '@/lib/authValidators'
 import { hashInviteToken, inviteStatus } from '@/lib/invites'
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit'
+import { checkRateLimit, routeKey } from '@/lib/rateLimit'
 
 const signupSchema = z.object({
   token: z.string().min(1).max(128),
@@ -15,7 +15,7 @@ const signupSchema = z.object({
 })
 
 export async function POST(request: Request) {
-  const rate = checkRateLimit(`signup:${getIpKey(request)}`, 5, 60_000)
+  const rate = checkRateLimit(routeKey(request, 'signup'), 5, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many attempts — try again shortly' }, { status: 429 })
   }

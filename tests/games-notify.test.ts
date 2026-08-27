@@ -24,6 +24,7 @@ jest.mock('@/lib/discord', () => ({
 
 jest.mock('@/lib/rateLimit', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+  routeKey: (request: unknown, route: string) => `${route}:${mockGetIpKey(request)}`,
   getIpKey: (...args: unknown[]) => mockGetIpKey(...args),
 }));
 

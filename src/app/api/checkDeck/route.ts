@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseDeckList } from '@/lib/parseDeck';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { normalizeCardName } from '@/lib/parseMoxfield';
 
 export async function POST(request: Request) {
-  const rl = checkRateLimit(getIpKey(request), 10, 60000);
+  const rl = checkRateLimit(routeKey(request, 'checkdeck:post'), 10, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
