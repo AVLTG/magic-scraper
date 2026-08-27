@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { buildLibraryNameIndex, findLibraryName, isBasicLand } from '@/lib/parseMoxfield';
-import { matchDeckParticipants } from '@/lib/reconcile';
+import { matchDeckParticipants, normalizeName } from '@/lib/reconcile';
 
 export async function GET(
   request: Request,
@@ -112,29 +112,39 @@ export async function PATCH(
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
-    const deck = await prisma.deck.findUnique({ where: { id } });
+    const deck = await prisma.deck.findUnique({
+      where: { id },
+      include: { owner: { select: { name: true } } },
+    });
     if (!deck) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    if (deck.ownerUserId === null || deck.ownerUserId !== session.userId) {
+    if (deck.ownerUserId === null || deck.ownerUserId !== session.userId || !deck.owner) {
       return NextResponse.json({ error: 'Only the deck owner can rename it' }, { status: 403 });
     }
 
     const { name } = renameSchema.parse(await request.json());
     const oldName = deck.name;
 
-    // Block renaming onto another of the user's decks (a same-name self-rename,
-    // i.e. only case/spacing changed, is allowed and rewrites history spelling).
-    const clash = await prisma.deck.findFirst({
-      where: { ownerUserId: session.userId, id: { not: id }, name },
+    // Block renaming onto another of the user's decks. Compared case-insensitively
+    // to match the create check (POST /api/decks) — a case-only variant would
+    // break every name-normalized join (deckAutoCreate, admin gamesByDeck).
+    const mine = await prisma.deck.findMany({
+      where: { ownerUserId: session.userId },
+      select: { id: true, name: true },
     });
-    if (clash) {
+    if (mine.some((d) => d.id !== id && normalizeName(d.name) === normalizeName(name))) {
       return NextResponse.json({ error: 'You already have a deck with that name' }, { status: 409 });
     }
 
+    // Only rewrite history rows attributed to the owner: deck names are unique
+    // per owner, not globally, so an unscoped name match would also rewrite
+    // other players' games that happen to use the same deck name.
+    const ownerKey = normalizeName(deck.owner.name);
     const { updated, gameCount } = await prisma.$transaction(async (tx) => {
-      const parts = await tx.gameParticipant.findMany({
+      const allParts = await tx.gameParticipant.findMany({
         where: { deckName: { not: null } },
-        select: { id: true, gameId: true, deckName: true },
+        select: { id: true, gameId: true, deckName: true, playerName: true },
       });
+      const parts = allParts.filter((p) => normalizeName(p.playerName) === ownerKey);
       const { ids, gameCount } = matchDeckParticipants(parts, oldName);
 
       const d = await tx.deck.update({ where: { id }, data: { name } });
