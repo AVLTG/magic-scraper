@@ -186,6 +186,7 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
               }
             }}
             className={`group rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-accent ${expanded ? "border-accent/60 bg-surface" : "border-border hover:border-accent/40"}`}
+          >
             {c.scryfallId && (
               <div className="hidden md:group-hover:block fixed z-[9999] pointer-events-none">
                 <img
