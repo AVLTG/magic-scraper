@@ -174,10 +174,18 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
         return (
           <div
             key={key}
+            role="button"
+            tabIndex={0}
+            aria-expanded={expanded}
+            aria-label={`${c.cardName}, quantity ${c.quantity}. Activate to ${expanded ? "collapse" : "adjust quantity"}.`}
             onClick={() => setExpandedKey(expanded ? null : key)}
-            className={`group rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors ${expanded ? "border-accent/60 bg-surface" : "border-border hover:border-accent/40"}`}
-            title={deck.isOwner ? "Click to adjust quantity" : undefined}
-          >
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setExpandedKey(expanded ? null : key);
+              }
+            }}
+            className={`group rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-accent ${expanded ? "border-accent/60 bg-surface" : "border-border hover:border-accent/40"}`}
             {c.scryfallId && (
               <div className="hidden md:group-hover:block fixed z-[9999] pointer-events-none">
                 <img
@@ -199,8 +207,8 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
                   <span className="text-[10px] bg-amber-500/15 text-amber-400 px-1 py-px rounded font-medium">Foil</span>
                 )}
                 {!c.inLibrary && (
-                  <span className="text-[10px] bg-red-500/15 text-red-400 px-1 py-px rounded" title="Not in the owner's library">
-                    !
+                  <span className="text-[10px] bg-red-500/15 text-red-400 px-1 py-px rounded" title="Not in the owner's library" aria-label="Not in the owner's library">
+                    <span aria-hidden="true">!</span>
                   </span>
                 )}
                 <span className="font-mono text-xs text-muted">x{c.quantity}</span>

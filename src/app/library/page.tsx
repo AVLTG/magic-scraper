@@ -186,9 +186,18 @@ export default function LibraryPage() {
           return (
             <div
               key={c.id}
+              role="button"
+              tabIndex={0}
+              aria-expanded={expanded}
+              aria-label={`${c.cardName}, quantity ${c.quantity}. Activate to ${expanded ? "collapse" : "show"} details.`}
               onClick={() => setExpandedId(expanded ? null : c.id)}
-              className={`rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors ${expanded ? "border-accent/60 bg-surface" : "border-border hover:border-accent/40"}`}
-              title="Click for details"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setExpandedId(expanded ? null : c.id);
+                }
+              }}
+              className={`rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-accent ${expanded ? "border-accent/60 bg-surface" : "border-border hover:border-accent/40"}`}
             >
               <div className="flex items-center justify-between gap-2 min-w-0">
                 <span className="font-medium truncate">
@@ -200,7 +209,9 @@ export default function LibraryPage() {
                     <span className="text-[10px] bg-amber-500/15 text-amber-400 px-1 py-px rounded font-medium">Foil</span>
                   )}
                   {c.source === "manual" && (
-                    <span className="text-[10px] bg-sky-500/15 text-sky-400 px-1 py-px rounded font-medium">M</span>
+                    <span className="text-[10px] bg-sky-500/15 text-sky-400 px-1 py-px rounded font-medium" title="Manually added" aria-label="Manually added">
+                      <span aria-hidden="true">M</span>
+                    </span>
                   )}
                   <span className="font-mono text-xs text-muted">x{c.quantity}</span>
                 </span>
