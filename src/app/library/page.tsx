@@ -37,6 +37,9 @@ export default function LibraryPage() {
   const [addStatus, setAddStatus] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
+  // Compact grid: details live behind a click. One expanded card at a time.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   const loadCards = async () => {
     try {
       const res = await fetch("/api/library");
@@ -177,35 +180,66 @@ export default function LibraryPage() {
         </select>
       </div>
 
-      <div className="space-y-1">
-        {filtered.map((c) => (
-          <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-medium truncate">{c.cardName}</span>
-              <span className="text-xs text-muted">({c.set.toUpperCase()})</span>
-              <span className="bg-surface text-muted px-1.5 py-0.5 rounded text-xs font-mono">x{c.quantity}</span>
-              {c.isFoil && (
-                <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-medium">Foil</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5">
+        {filtered.map((c) => {
+          const expanded = expandedId === c.id;
+          return (
+            <div
+              key={c.id}
+              role="button"
+              tabIndex={0}
+              aria-expanded={expanded}
+              aria-label={`${c.cardName}, quantity ${c.quantity}. Activate to ${expanded ? "collapse" : "show"} details.`}
+              onClick={() => setExpandedId(expanded ? null : c.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setExpandedId(expanded ? null : c.id);
+                }
+              }}
+              className={`rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-accent ${expanded ? "border-accent/60 bg-surface" : "border-border hover:border-accent/40"}`}
+            >
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <span className="font-medium truncate">
+                  {c.cardName}
+                  <span className="text-xs text-muted font-normal"> ({c.set.toUpperCase()})</span>
+                </span>
+                <span className="flex items-center gap-1 shrink-0">
+                  {c.isFoil && (
+                    <span className="text-[10px] bg-amber-500/15 text-amber-400 px-1 py-px rounded font-medium">Foil</span>
+                  )}
+                  {c.source === "manual" && (
+                    <span className="text-[10px] bg-sky-500/15 text-sky-400 px-1 py-px rounded font-medium" title="Manually added" aria-label="Manually added">
+                      <span aria-hidden="true">M</span>
+                    </span>
+                  )}
+                  <span className="font-mono text-xs text-muted">x{c.quantity}</span>
+                </span>
+              </div>
+              {c.decks.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
+                  {c.decks.map((d) => (
+                    <Link
+                      key={d.id}
+                      href={`/decks/${d.id}`}
+                      className="text-[11px] bg-accent-muted text-accent px-1.5 py-px rounded hover:underline"
+                    >
+                      {d.name}
+                    </Link>
+                  ))}
+                </div>
               )}
-              {c.source === "manual" && (
-                <span className="text-xs bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded font-medium">Manual</span>
+              {expanded && (
+                <dl className="text-xs text-muted pt-1.5 mt-1.5 border-t border-border space-y-0.5">
+                  <div className="flex gap-1"><dt className="shrink-0">Type:</dt><dd className="text-foreground/80 truncate">{c.typeLine || "—"}</dd></div>
+                  <div className="flex gap-1"><dt className="shrink-0">Set:</dt><dd className="text-foreground/80 truncate">{c.setName}</dd></div>
+                  <div className="flex gap-1"><dt className="shrink-0">Condition:</dt><dd className="text-foreground/80">{c.condition}</dd></div>
+                  <div className="flex gap-1"><dt className="shrink-0">Source:</dt><dd className="text-foreground/80">{c.source === "manual" ? "Manually added" : "Moxfield"}</dd></div>
+                </dl>
               )}
             </div>
-            {c.decks.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {c.decks.map((d) => (
-                  <Link
-                    key={d.id}
-                    href={`/decks/${d.id}`}
-                    className="text-xs bg-accent-muted text-accent px-1.5 py-0.5 rounded hover:underline"
-                  >
-                    {d.name}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
         {filtered.length === 0 && <p className="text-muted text-sm">No cards match the current filters.</p>}
       </div>
     </div>

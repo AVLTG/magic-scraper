@@ -43,7 +43,7 @@ children,
       <body
         className={`${archivo.variable} ${archivoNarrow.variable} antialiased`}
       >
-        <div className="mx-auto max-w-7xl px-6 lg:px-10">
+        <div className="mx-auto max-w-[1600px] px-4 lg:px-8">
           <ConditionalHeader />
           {children}
         </div>
