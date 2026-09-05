@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { createSessionToken, COOKIE_OPTIONS, COOKIE_NAMES, LEGACY_ADMIN_USER_ID } from '@/lib/auth'
 import { verifyPassword } from '@/lib/password'
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit'
+import { checkRateLimit, routeKey } from '@/lib/rateLimit'
 
 const loginSchema = z.object({
   username: z.string().trim().max(32).optional(),
@@ -28,7 +28,7 @@ function constantTimeEqual(a: string, b: string): boolean {
 }
 
 export async function POST(request: Request) {
-  const rate = checkRateLimit(`login:${getIpKey(request)}`, 10, 60_000)
+  const rate = checkRateLimit(routeKey(request, 'login'), 10, 60_000)
   if (!rate.allowed) {
     return NextResponse.json(
       { error: 'Too many attempts — try again shortly' },

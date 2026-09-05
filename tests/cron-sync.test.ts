@@ -160,3 +160,35 @@ describe('cron sync environment gating (production-only)', () => {
     expect(mockUpdateAll).not.toHaveBeenCalled()
   })
 })
+
+describe('cron sync auth when CRON_SECRET is unset', () => {
+  const ORIGINAL_SECRET = process.env.CRON_SECRET
+
+  beforeEach(() => {
+    mockUpdateAll.mockClear()
+    mockSendDiscord.mockClear()
+    mockUpdateAll.mockResolvedValue({ succeeded: ['Alice'], failed: [] })
+    mockSendDiscord.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    if (ORIGINAL_SECRET === undefined) delete process.env.CRON_SECRET
+    else process.env.CRON_SECRET = ORIGINAL_SECRET
+  })
+
+  it('rejects the literal "Bearer undefined" — no auth fallthrough on misconfiguration', async () => {
+    delete process.env.CRON_SECRET
+    const req = makeCronRequest('Bearer undefined')
+    const response = await GET(req)
+    expect(response.status).toBe(401)
+    expect(mockUpdateAll).not.toHaveBeenCalled()
+    expect(mockSendDiscord).not.toHaveBeenCalled()
+  })
+
+  it('rejects every header when the secret is unset', async () => {
+    delete process.env.CRON_SECRET
+    const req = makeCronRequest('Bearer ')
+    const response = await GET(req)
+    expect(response.status).toBe(401)
+  })
+})

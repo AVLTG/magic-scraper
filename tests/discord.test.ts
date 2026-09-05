@@ -24,7 +24,7 @@ describe('sendDiscordAlert', () => {
     process.env.DISCORD_WEBHOOK_URL = WEBHOOK_URL;
     mockFetch.mockResolvedValue({ ok: true, status: 204, text: async () => '' });
 
-    await sendDiscordAlert({ content: 'Sync failed for Alice' });
+    await expect(sendDiscordAlert({ content: 'Sync failed for Alice' })).resolves.toBe(true);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch).toHaveBeenCalledWith(WEBHOOK_URL, {
@@ -37,7 +37,7 @@ describe('sendDiscordAlert', () => {
   it('logs error and returns (no throw) when DISCORD_WEBHOOK_URL is unset', async () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(sendDiscordAlert({ content: 'test' })).resolves.toBeUndefined();
+    await expect(sendDiscordAlert({ content: 'test' })).resolves.toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('DISCORD_WEBHOOK_URL'));
 
@@ -49,7 +49,7 @@ describe('sendDiscordAlert', () => {
     mockFetch.mockRejectedValue(new Error('network error'));
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(sendDiscordAlert({ content: 'test' })).resolves.toBeUndefined();
+    await expect(sendDiscordAlert({ content: 'test' })).resolves.toBe(false);
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('Discord webhook POST failed'),
       expect.any(Error)
@@ -63,7 +63,7 @@ describe('sendDiscordAlert', () => {
     mockFetch.mockResolvedValue({ ok: false, status: 429, text: async () => 'rate limited' });
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(sendDiscordAlert({ content: 'test' })).resolves.toBeUndefined();
+    await expect(sendDiscordAlert({ content: 'test' })).resolves.toBe(false);
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('429'));
 
     consoleSpy.mockRestore();

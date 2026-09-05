@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 
 export async function GET(request: Request) {
-  const rl = checkRateLimit(getIpKey(request), 30, 60000);
+  const rl = checkRateLimit(routeKey(request, 'players:get'), 30, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },

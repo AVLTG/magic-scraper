@@ -32,6 +32,25 @@ describe('parseDeckList Moxfield-export tolerance (deck checker)', () => {
   it('still skips basic lands, including suffixed ones', () => {
     expect(parseDeckList('12 Plains (FDN) 269\nIsland\n1 Snow-Covered Forest (KHM) 284')).toEqual([])
   })
+
+  it('skips bare section headers instead of emitting phantom cards', () => {
+    expect(parseDeckList('Deck\n4 Lightning Bolt\nSideboard\n2 Duress\nCommander\n1 Atraxa')).toEqual([
+      { quantity: 4, name: 'Lightning Bolt' },
+      { quantity: 2, name: 'Duress' },
+      { quantity: 1, name: 'Atraxa' },
+    ])
+  })
+
+  it('unwraps MTGO-style "SB:" lines so sideboard cards still match', () => {
+    expect(parseDeckList('SB: 2 Duress\nSB:1 Flusterstorm')).toEqual([
+      { quantity: 2, name: 'Duress' },
+      { quantity: 1, name: 'Flusterstorm' },
+    ])
+  })
+
+  it('skips a bare SB: line instead of emitting a phantom card', () => {
+    expect(parseDeckList('SB:\n4 Lightning Bolt')).toEqual([{ quantity: 4, name: 'Lightning Bolt' }])
+  })
 })
 
 describe('isBasicLand', () => {

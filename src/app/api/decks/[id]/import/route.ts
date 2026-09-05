@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { parseMoxfieldText, buildLibraryNameIndex, normalizeCardName, type ParsedMoxfieldCard } from '@/lib/parseMoxfield';
-import { classifyMoxfieldCards, resolveMissingToLibrary } from '@/lib/deckImport';
+import { classifyMoxfieldCards, resolveMissingToLibrary, boardSchema } from '@/lib/deckImport';
 
 const importSchema = z.object({
   text: z.string().min(1).max(100_000),
   dryRun: z.boolean().default(false),
   addMissingToLibrary: z.boolean().optional(),
+  board: boardSchema.default('main'),
 });
 
 interface DeckCardDraft {
@@ -18,13 +19,14 @@ interface DeckCardDraft {
   set?: string;
   collectorNumber?: string;
   isFoil: boolean;
+  board: string;
 }
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const rl = checkRateLimit(getIpKey(request), 10, 60000);
+  const rl = checkRateLimit(routeKey(request, 'decks-id-import:post'), 10, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
@@ -42,7 +44,7 @@ export async function POST(
       return NextResponse.json({ error: 'Only the deck owner can import cards' }, { status: 403 });
     }
 
-    const { text, dryRun, addMissingToLibrary } = importSchema.parse(await request.json());
+    const { text, dryRun, addMissingToLibrary, board } = importSchema.parse(await request.json());
 
     const { cards, errors } = parseMoxfieldText(text);
     const lib = await prisma.collectionCard.findMany({
@@ -70,10 +72,10 @@ export async function POST(
     // Merge duplicate names (different printings) — quantities sum, first printing wins.
     const drafts = new Map<string, DeckCardDraft>();
     const addDraft = (cardName: string, c: ParsedMoxfieldCard) => {
-      const key = normalizeCardName(cardName);
+      const key = `${normalizeCardName(cardName)}:${board}`;
       const existing = drafts.get(key);
       if (existing) existing.quantity += c.quantity;
-      else drafts.set(key, { cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil });
+      else drafts.set(key, { cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil, board });
     };
     for (const { card, canonical } of present) addDraft(canonical, card);
     for (const card of basics) addDraft(card.name, card);
@@ -100,16 +102,16 @@ export async function POST(
       }
       for (const d of drafts.values()) {
         await tx.deckCard.upsert({
-          where: { deckId_cardName: { deckId: id, cardName: d.cardName } },
+          where: { deckId_cardName_board: { deckId: id, cardName: d.cardName, board: d.board } },
           update: { quantity: { increment: d.quantity } },
-          create: { deckId: id, cardName: d.cardName, quantity: d.quantity, set: d.set, collectorNumber: d.collectorNumber, isFoil: d.isFoil },
+          create: { deckId: id, cardName: d.cardName, quantity: d.quantity, set: d.set, collectorNumber: d.collectorNumber, isFoil: d.isFoil, board: d.board },
         });
       }
     });
 
     const updated = await prisma.deckCard.findMany({ where: { deckId: id }, orderBy: { cardName: 'asc' } });
     return NextResponse.json({
-      cards: updated.map((c) => ({ cardName: c.cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil })),
+      cards: updated.map((c) => ({ cardName: c.cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil, board: c.board })),
       addedToLibrary: libraryInserts.length,
       excluded,
       errors,

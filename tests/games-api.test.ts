@@ -33,6 +33,7 @@ jest.mock('@/lib/prisma', () => ({
 
 jest.mock('@/lib/rateLimit', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+  routeKey: (request: unknown, route: string) => `${route}:${mockGetIpKey(request)}`,
   getIpKey: (...args: unknown[]) => mockGetIpKey(...args),
 }));
 
@@ -332,7 +333,7 @@ describe('POST /api/games', () => {
     });
     mockParticipantCreateMany.mockResolvedValue({ count: 2 });
     await POST(makeRequest(validGameBody));
-    expect(mockCheckRateLimit).toHaveBeenCalledWith('test-ip', 30, 60000);
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('games:post:test-ip', 30, 60000);
   });
 
   it('persists variant and role for a KING-variant game', async () => {

@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { buildLibraryNameIndex, findLibraryName, normalizeCardName, isBasicLand } from '@/lib/parseMoxfield';
+import { boardSchema, type Board } from '@/lib/deckImport';
 
 const addSchema = z.object({
   cardName: z.string().trim().min(1).max(200),
@@ -11,13 +12,20 @@ const addSchema = z.object({
   set: z.string().trim().max(6).optional(),
   collectorNumber: z.string().trim().max(20).optional(),
   isFoil: z.boolean().default(false),
+  board: boardSchema.default('main'),
+});
+
+const nameAndBoard = z.object({
+  cardName: z.string().trim().min(1).max(200),
+  board: boardSchema.default('main'),
 });
 
 const bodySchema = z.object({
   add: z.array(addSchema).max(500).optional(),
-  remove: z.array(z.string().trim().min(1).max(200)).max(500).optional(),
+  // Legacy clients send bare names — those target the main board.
+  remove: z.array(z.union([z.string().trim().min(1).max(200), nameAndBoard])).max(500).optional(),
   setQuantity: z
-    .array(z.object({ cardName: z.string().trim().min(1).max(200), quantity: z.number().int().min(0).max(999) }))
+    .array(z.object({ cardName: z.string().trim().min(1).max(200), quantity: z.number().int().min(0).max(999), board: boardSchema.default('main') }))
     .max(500)
     .optional(),
 });
@@ -26,7 +34,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const rl = checkRateLimit(getIpKey(request), 20, 60000);
+  const rl = checkRateLimit(routeKey(request, 'decks-id-cards:put'), 20, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
@@ -71,13 +79,19 @@ export async function PUT(
     }
 
     await prisma.$transaction(async (tx) => {
-      // Map normalized -> stored deck card name for remove/setQuantity matching
-      const stored = await tx.deckCard.findMany({ where: { deckId: id }, select: { cardName: true } });
-      const storedByNorm = new Map(stored.map((c) => [normalizeCardName(c.cardName), c.cardName]));
+      // Map (normalized name, board) -> stored deck card name for
+      // remove/setQuantity matching
+      const stored = await tx.deckCard.findMany({ where: { deckId: id }, select: { cardName: true, board: true } });
+      const storedByKey = new Map(
+        // board predates nullable mocks — treat missing as 'main'
+        stored.map((c) => [`${normalizeCardName(c.cardName)}:${c.board ?? 'main'}`, c.cardName] as const)
+      );
+      const lookup = (cardName: string, board: Board) =>
+        storedByKey.get(`${normalizeCardName(cardName)}:${board}`);
 
       for (const a of canonicalAdds) {
         await tx.deckCard.upsert({
-          where: { deckId_cardName: { deckId: id, cardName: a.canonicalName } },
+          where: { deckId_cardName_board: { deckId: id, cardName: a.canonicalName, board: a.board } },
           update: { quantity: { increment: a.quantity } },
           create: {
             deckId: id,
@@ -86,29 +100,30 @@ export async function PUT(
             set: a.set,
             collectorNumber: a.collectorNumber,
             isFoil: a.isFoil,
+            board: a.board,
           },
         });
       }
 
       if (body.remove && body.remove.length > 0) {
-        const names = body.remove
-          .map((n) => storedByNorm.get(normalizeCardName(n)))
-          .filter((n): n is string => n !== undefined);
-        if (names.length > 0) {
-          await tx.deckCard.deleteMany({ where: { deckId: id, cardName: { in: names } } });
+        for (const n of body.remove) {
+          const cardName = typeof n === 'string' ? lookup(n, 'main') : lookup(n.cardName, n.board);
+          const board: Board = typeof n === 'string' ? 'main' : n.board;
+          if (cardName !== undefined) {
+            await tx.deckCard.deleteMany({ where: { deckId: id, cardName, board } });
+          }
         }
       }
 
       if (body.setQuantity && body.setQuantity.length > 0) {
-        const toDelete: string[] = [];
         for (const sq of body.setQuantity) {
-          const name = storedByNorm.get(normalizeCardName(sq.cardName));
+          const name = lookup(sq.cardName, sq.board);
           if (!name) continue;
-          if (sq.quantity <= 0) toDelete.push(name);
-          else await tx.deckCard.updateMany({ where: { deckId: id, cardName: name }, data: { quantity: sq.quantity } });
-        }
-        if (toDelete.length > 0) {
-          await tx.deckCard.deleteMany({ where: { deckId: id, cardName: { in: toDelete } } });
+          if (sq.quantity <= 0) {
+            await tx.deckCard.deleteMany({ where: { deckId: id, cardName: name, board: sq.board } });
+          } else {
+            await tx.deckCard.updateMany({ where: { deckId: id, cardName: name, board: sq.board }, data: { quantity: sq.quantity } });
+          }
         }
       }
     });
@@ -124,6 +139,7 @@ export async function PUT(
         set: c.set,
         collectorNumber: c.collectorNumber,
         isFoil: c.isFoil,
+        board: c.board,
       })),
     });
   } catch (error) {

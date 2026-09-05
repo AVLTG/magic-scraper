@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
-import { checkRateLimit, getIpKey } from '@/lib/rateLimit';
+import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 
 const deckCreateSchema = z.object({
   name: z.string().trim().min(1, 'name is required').max(100, 'name too long'),
 });
 
 export async function GET(request: Request) {
-  const rl = checkRateLimit(getIpKey(request), 30, 60000);
+  const rl = checkRateLimit(routeKey(request, 'decks:get'), 30, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const rl = checkRateLimit(getIpKey(request), 10, 60000);
+  const rl = checkRateLimit(routeKey(request, 'decks:post'), 10, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },

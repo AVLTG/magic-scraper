@@ -1,5 +1,6 @@
 const mockDeckFindUnique = jest.fn()
 const mockDeckFindFirst = jest.fn()
+const mockDeckFindMany = jest.fn()
 const mockDeckUpdate = jest.fn()
 const mockGPFindMany = jest.fn()
 const mockGPUpdateMany = jest.fn()
@@ -15,6 +16,7 @@ jest.mock('@/lib/prisma', () => ({
     deck: {
       findUnique: (...a: unknown[]) => mockDeckFindUnique(...a),
       findFirst: (...a: unknown[]) => mockDeckFindFirst(...a),
+      findMany: (...a: unknown[]) => mockDeckFindMany(...a),
     },
     $transaction: (fn: (t: unknown) => Promise<unknown>) => fn(tx),
   },
@@ -44,19 +46,20 @@ const params = { params: Promise.resolve({ id: 'd1' }) }
 
 describe('PATCH /api/decks/[id] (rename)', () => {
   beforeEach(() => {
-    mockGetSession.mockReset(); mockDeckFindUnique.mockReset(); mockDeckFindFirst.mockReset()
+    mockGetSession.mockReset(); mockDeckFindUnique.mockReset(); mockDeckFindFirst.mockReset(); mockDeckFindMany.mockReset()
     mockDeckUpdate.mockReset(); mockGPFindMany.mockReset(); mockGPUpdateMany.mockReset()
     mockGetSession.mockResolvedValue(MEMBER)
-    mockDeckFindUnique.mockResolvedValue({ id: 'd1', name: 'Old Name', ownerUserId: 'u1' })
+    mockDeckFindUnique.mockResolvedValue({ id: 'd1', name: 'Old Name', ownerUserId: 'u1', owner: { name: 'Alice' } })
     mockDeckFindFirst.mockResolvedValue(null)
+    mockDeckFindMany.mockResolvedValue([])
   })
 
-  it('renames the deck and propagates the new name to matching game participants', async () => {
+  it('renames the deck and propagates the new name to the owner matching game participants', async () => {
     mockDeckUpdate.mockResolvedValue({ id: 'd1', name: 'New Name' })
     mockGPFindMany.mockResolvedValue([
-      { id: 'p1', gameId: 'g1', deckName: 'Old Name' },
-      { id: 'p2', gameId: 'g2', deckName: 'old name' },
-      { id: 'p3', gameId: 'g3', deckName: 'Other' },
+      { id: 'p1', gameId: 'g1', deckName: 'Old Name', playerName: 'Alice' },
+      { id: 'p2', gameId: 'g2', deckName: 'old name', playerName: 'alice' },
+      { id: 'p3', gameId: 'g3', deckName: 'Other', playerName: 'Alice' },
     ])
     mockGPUpdateMany.mockResolvedValue({ count: 2 })
     const res: any = await PATCH(makeRequest({ name: 'New Name' }), params)
@@ -65,20 +68,57 @@ describe('PATCH /api/decks/[id] (rename)', () => {
     expect(res.body).toEqual({ deck: { id: 'd1', name: 'New Name' }, renamedGames: 2 })
   })
 
+  it('never rewrites another player history that happens to use the same deck name', async () => {
+    mockDeckUpdate.mockResolvedValue({ id: 'd1', name: 'New Name' })
+    mockGPFindMany.mockResolvedValue([
+      { id: 'p1', gameId: 'g1', deckName: 'Old Name', playerName: 'Alice' },
+      { id: 'p2', gameId: 'g2', deckName: 'Old Name', playerName: 'Bob' },
+      { id: 'p3', gameId: 'g3', deckName: 'old name', playerName: 'Bob' },
+    ])
+    mockGPUpdateMany.mockResolvedValue({ count: 1 })
+    const res: any = await PATCH(makeRequest({ name: 'New Name' }), params)
+    expect(mockGPUpdateMany).toHaveBeenCalledWith({ where: { id: { in: ['p1'] } }, data: { deckName: 'New Name' } })
+    expect(res.body.renamedGames).toBe(1)
+  })
+
   it('403s a non-owner; 404s a missing deck; 400s an empty name', async () => {
     mockGetSession.mockResolvedValue({ userId: 'u2', role: 'MEMBER', isLegacyAdmin: false })
     expect(((await PATCH(makeRequest({ name: 'X' }), params)) as any).status).toBe(403)
     mockGetSession.mockResolvedValue(MEMBER)
     mockDeckFindUnique.mockResolvedValue(null)
     expect(((await PATCH(makeRequest({ name: 'X' }), params)) as any).status).toBe(404)
-    mockDeckFindUnique.mockResolvedValue({ id: 'd1', name: 'Old Name', ownerUserId: 'u1' })
+    mockDeckFindUnique.mockResolvedValue({ id: 'd1', name: 'Old Name', ownerUserId: 'u1', owner: { name: 'Alice' } })
     expect(((await PATCH(makeRequest({ name: '   ' }), params)) as any).status).toBe(400)
   })
 
-  it('409s when the owner already has another deck with that name', async () => {
-    mockDeckFindFirst.mockResolvedValue({ id: 'd2' })
-    const res: any = await PATCH(makeRequest({ name: 'Existing' }), params)
+  it('409s when the owner already has another deck with that name (case-insensitive)', async () => {
+    mockDeckFindMany.mockResolvedValue([
+      { id: 'd1', name: 'Old Name' },
+      { id: 'd2', name: 'Krenko' },
+    ])
+    const res: any = await PATCH(makeRequest({ name: '  krenko ' }), params)
     expect(res.status).toBe(409)
     expect(mockDeckUpdate).not.toHaveBeenCalled()
+  })
+
+  it('returns 200 without updating when the PATCH has no effective change', async () => {
+    const noop: any = await PATCH(makeRequest({}), params)
+    expect(noop.status).toBe(200)
+    expect(noop.body.deck).toEqual({ id: 'd1', name: 'Old Name', format: undefined, commander: undefined })
+    expect(mockDeckUpdate).not.toHaveBeenCalled()
+    const same: any = await PATCH(makeRequest({ name: 'old name' }), params)
+    expect(same.status).toBe(200)
+    expect(mockDeckUpdate).not.toHaveBeenCalled()
+  })
+
+  it('updates format/commander without touching the name or game history', async () => {
+    mockDeckUpdate.mockResolvedValue({ id: 'd1', name: 'Old Name', format: 'Commander', commander: 'Ur-Dragon' })
+    const res: any = await PATCH(makeRequest({ format: 'Commander', commander: 'Ur-Dragon' }), params)
+    expect(mockDeckUpdate).toHaveBeenCalledWith({
+      where: { id: 'd1' },
+      data: { format: 'Commander', commander: 'Ur-Dragon' },
+    })
+    expect(mockGPFindMany).not.toHaveBeenCalled()
+    expect(res.body.deck).toEqual({ id: 'd1', name: 'Old Name', format: 'Commander', commander: 'Ur-Dragon' })
   })
 })

@@ -94,3 +94,26 @@ describe('POST /api/decks', () => {
     expect(((await POST(makeRequest({ name: 'x'.repeat(101) }))) as any).status).toBe(400)
   })
 })
+
+describe('rate-limit bucket isolation across routes', () => {
+  it('a flood of GETs does not lock out POST from the same IP', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    mockDeckFindMany.mockResolvedValue([])
+    mockDeckCreate.mockResolvedValue({ id: 'new', name: 'Flood Safe' })
+
+    // Same client IP for every request. GET /api/decks allows 30/min; before
+    // per-route bucket keys, these entries also filled the shared per-IP
+    // bucket and the limit-10 POST (and every other route) got spurious 429s.
+    const req = () =>
+      ({ json: async () => ({ name: 'Flood Safe' }), headers: { get: (n: string) => (n === 'x-forwarded-for' ? '10.9.9.9' : null) } }) as unknown as Request
+
+    for (let i = 0; i < 30; i++) {
+      const res: any = await GET(req())
+      expect(res.status).not.toBe(429)
+    }
+
+    const postRes: any = await POST(req())
+    expect(postRes.status).not.toBe(429)
+    expect(mockDeckCreate).toHaveBeenCalled()
+  })
+})

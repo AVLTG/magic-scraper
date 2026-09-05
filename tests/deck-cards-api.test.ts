@@ -71,8 +71,24 @@ describe('PUT /api/decks/[id]/cards', () => {
     expect(res.status).toBe(200)
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { deckId_cardName: { deckId: 'd1', cardName: 'Spikefield Hazard // Spikefield Cave' } },
+        where: { deckId_cardName_board: { deckId: 'd1', cardName: 'Spikefield Hazard // Spikefield Cave', board: 'main' } },
         update: { quantity: { increment: 2 } },
+      })
+    )
+  })
+
+  it('targets a non-main board when requested', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    mockDeckFindUnique.mockResolvedValue(OWNED)
+    mockCollectionFindMany.mockResolvedValue([{ cardName: 'Sol Ring' }])
+    const res: any = await PUT(
+      makeRequest({ add: [{ cardName: 'Sol Ring', quantity: 1, board: 'side' }] }),
+      params
+    )
+    expect(res.status).toBe(200)
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { deckId_cardName_board: { deckId: 'd1', cardName: 'Sol Ring', board: 'side' } },
       })
     )
   })
@@ -93,7 +109,17 @@ describe('PUT /api/decks/[id]/cards', () => {
     mockDeckCardFindMany.mockResolvedValue([{ cardName: 'Sol Ring' }])
     await PUT(makeRequest({ remove: ['sol ring'] }), params)
     expect(mockDeleteMany).toHaveBeenCalledWith({
-      where: { deckId: 'd1', cardName: { in: ['Sol Ring'] } },
+      where: { deckId: 'd1', cardName: 'Sol Ring', board: 'main' },
+    })
+  })
+
+  it('removes from a non-main board when requested', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    mockDeckFindUnique.mockResolvedValue(OWNED)
+    mockDeckCardFindMany.mockResolvedValue([{ cardName: 'Sol Ring', board: 'side' }])
+    await PUT(makeRequest({ remove: [{ cardName: 'sol ring', board: 'side' }] }), params)
+    expect(mockDeleteMany).toHaveBeenCalledWith({
+      where: { deckId: 'd1', cardName: 'Sol Ring', board: 'side' },
     })
   })
 
@@ -105,9 +131,9 @@ describe('PUT /api/decks/[id]/cards', () => {
       makeRequest({ setQuantity: [{ cardName: 'Sol Ring', quantity: 0 }, { cardName: 'Arcane Signet', quantity: 4 }] }),
       params
     )
-    expect(mockDeleteMany).toHaveBeenCalledWith({ where: { deckId: 'd1', cardName: { in: ['Sol Ring'] } } })
+    expect(mockDeleteMany).toHaveBeenCalledWith({ where: { deckId: 'd1', cardName: 'Sol Ring', board: 'main' } })
     expect(mockUpdateMany).toHaveBeenCalledWith({
-      where: { deckId: 'd1', cardName: 'Arcane Signet' },
+      where: { deckId: 'd1', cardName: 'Arcane Signet', board: 'main' },
       data: { quantity: 4 },
     })
   })
@@ -131,7 +157,7 @@ describe('PUT /api/decks/[id]/cards', () => {
     expect(res.status).toBe(200)
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { deckId_cardName: { deckId: 'd1', cardName: 'Plains' } },
+        where: { deckId_cardName_board: { deckId: 'd1', cardName: 'Plains', board: 'main' } },
       })
     )
   })

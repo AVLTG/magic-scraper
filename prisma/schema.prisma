@@ -118,6 +118,8 @@ model Deck {
   id          String   @id @default(cuid())
   ownerUserId String?
   name        String
+  format      String?
+  commander   String?
   createdAt   DateTime @default(now())
 
   owner User?      @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
@@ -135,10 +137,11 @@ model DeckCard {
   set             String?
   collectorNumber String?
   isFoil          Boolean @default(false)
+  board           String  @default("main")
 
   deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
 
-  @@unique([deckId, cardName])
+  @@unique([deckId, cardName, board])
   @@index([cardName])
   @@map("deck_cards")
 }

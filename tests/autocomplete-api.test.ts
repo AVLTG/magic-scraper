@@ -22,6 +22,7 @@ jest.mock('@/lib/prisma', () => ({
 jest.mock('@/lib/rateLimit', () => ({
   checkRateLimit: (key: string, limit: number, windowMs: number) =>
     mockCheckRateLimit(key, limit, windowMs),
+  routeKey: (request: Request, route: string) => `${route}:${mockGetIpKey(request)}`,
   getIpKey: (request: Request) => mockGetIpKey(request),
 }));
 
@@ -78,7 +79,7 @@ describe('GET /api/players', () => {
     mockUserFindMany.mockResolvedValue([]);
     mockParticipantFindMany.mockResolvedValue([]);
     await getPlayers(makeRequest());
-    expect(mockCheckRateLimit).toHaveBeenCalledWith('test-ip', 30, 60000);
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('players:get:test-ip', 30, 60000);
   });
 
   it('returns 500 on DB error', async () => {

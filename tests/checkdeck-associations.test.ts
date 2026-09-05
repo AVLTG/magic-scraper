@@ -12,6 +12,9 @@ jest.mock('@/lib/prisma', () => ({
   },
 }))
 
+const mockGetSession = jest.fn()
+jest.mock('@/lib/session', () => ({ getSession: (...a: unknown[]) => mockGetSession(...a) }))
+
 import { POST } from '../src/app/api/checkDeck/route'
 
 let ipCounter = 0
@@ -24,7 +27,10 @@ function makeRequest(body: Record<string, unknown>): Request {
 }
 
 describe('POST /api/checkDeck deck associations', () => {
-  beforeEach(() => { mockCollectionFindMany.mockReset(); mockDeckCardFindMany.mockReset() })
+  beforeEach(() => {
+    mockCollectionFindMany.mockReset(); mockDeckCardFindMany.mockReset()
+    mockGetSession.mockReset().mockResolvedValue({ userId: 'u1', role: 'MEMBER', isLegacyAdmin: false })
+  })
 
   it('attaches each OWNER own deck names to their owner rows', async () => {
     mockCollectionFindMany.mockResolvedValue([
