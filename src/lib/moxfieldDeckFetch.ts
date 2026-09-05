@@ -69,6 +69,14 @@ export async function fetchMoxfieldDeck(
       'User-Agent': 'TableTally/1.0',
       Referer: 'https://www.moxfield.com/',
     },
+    // Don't let a hung upstream hold the serverless function: map aborts to
+    // the same retryable error as other non-404 failures below.
+    signal: AbortSignal.timeout(15_000),
+  }).catch((error: unknown) => {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Moxfield took too long — try again or paste the list manually');
+    }
+    throw error;
   });
   if (res.status === 404) throw new Error('Deck not found — is the Moxfield link public?');
   if (!res.ok) throw new Error(`Moxfield returned ${res.status} — try again or paste the list manually`);

@@ -2,7 +2,10 @@
 -- Apply to production Turso manually; local dev uses `prisma db push`.
 --   turso db shell <your-db-name> < prisma/migrations-manual/2026-09-05-decks-format-commander-board.sql
 --
--- Safe to re-run: each statement is guarded.
+-- Safe to re-run with one caveat: the three ALTER TABLE ... ADD COLUMN
+-- statements have no IF NOT EXISTS guard (SQLite doesn't support one for
+-- columns), so a retry prints benign "duplicate column name" errors and the
+-- DROP/CREATE INDEX lines are IF-guarded and no-op.
 
 -- 1. Deck.format / Deck.commander (nullable; SQLite has no IF NOT EXISTS for
 -- columns, so run once and ignore "duplicate column name" on retry).

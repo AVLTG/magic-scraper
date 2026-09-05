@@ -100,4 +100,25 @@ describe('PATCH /api/decks/[id] (rename)', () => {
     expect(res.status).toBe(409)
     expect(mockDeckUpdate).not.toHaveBeenCalled()
   })
+
+  it('returns 200 without updating when the PATCH has no effective change', async () => {
+    const noop: any = await PATCH(makeRequest({}), params)
+    expect(noop.status).toBe(200)
+    expect(noop.body.deck).toEqual({ id: 'd1', name: 'Old Name', format: undefined, commander: undefined })
+    expect(mockDeckUpdate).not.toHaveBeenCalled()
+    const same: any = await PATCH(makeRequest({ name: 'old name' }), params)
+    expect(same.status).toBe(200)
+    expect(mockDeckUpdate).not.toHaveBeenCalled()
+  })
+
+  it('updates format/commander without touching the name or game history', async () => {
+    mockDeckUpdate.mockResolvedValue({ id: 'd1', name: 'Old Name', format: 'Commander', commander: 'Ur-Dragon' })
+    const res: any = await PATCH(makeRequest({ format: 'Commander', commander: 'Ur-Dragon' }), params)
+    expect(mockDeckUpdate).toHaveBeenCalledWith({
+      where: { id: 'd1' },
+      data: { format: 'Commander', commander: 'Ur-Dragon' },
+    })
+    expect(mockGPFindMany).not.toHaveBeenCalled()
+    expect(res.body.deck).toEqual({ id: 'd1', name: 'Old Name', format: 'Commander', commander: 'Ur-Dragon' })
+  })
 })

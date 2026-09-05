@@ -47,6 +47,10 @@ describe('parseDeckList Moxfield-export tolerance (deck checker)', () => {
       { quantity: 1, name: 'Flusterstorm' },
     ])
   })
+
+  it('skips a bare SB: line instead of emitting a phantom card', () => {
+    expect(parseDeckList('SB:\n4 Lightning Bolt')).toEqual([{ quantity: 4, name: 'Lightning Bolt' }])
+  })
 })
 
 describe('isBasicLand', () => {

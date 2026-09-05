@@ -174,6 +174,15 @@ export async function PATCH(
     // Only rewrite history rows attributed to the owner: deck names are unique
     // per owner, not globally, so an unscoped name match would also rewrite
     // other players' games that happen to use the same deck name.
+    // Build the update first: a PATCH with no effective change ({} or an
+    // unchanged name with no format/commander) must return the current deck,
+    // not 500 on Prisma's empty-update error.
+    const updateData: { name?: string; format?: string | null; commander?: string | null } = {
+      ...(renaming ? { name: name! } : {}),
+      ...(format !== undefined ? { format: format?.trim() ? format.trim() : null } : {}),
+      ...(commander !== undefined ? { commander: commander?.trim() ? commander.trim() : null } : {}),
+    };
+
     const ownerKey = normalizeName(deck.owner.name);
     const { updated, gameCount } = await prisma.$transaction(async (tx) => {
       let gameCount = 0;
@@ -190,14 +199,10 @@ export async function PATCH(
         }
       }
 
-      const d = await tx.deck.update({
-        where: { id },
-        data: {
-          ...(renaming ? { name: name! } : {}),
-          ...(format !== undefined ? { format: format?.trim() ? format.trim() : null } : {}),
-          ...(commander !== undefined ? { commander: commander?.trim() ? commander.trim() : null } : {}),
-        },
-      });
+      const d =
+        Object.keys(updateData).length > 0
+          ? await tx.deck.update({ where: { id }, data: updateData })
+          : deck;
       return { updated: d, gameCount };
     });
 

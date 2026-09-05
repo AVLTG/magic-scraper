@@ -13,7 +13,9 @@ export function parseDeckList(decklistText: string): DeckCard[] {
 
     // MTGO exports prefix sideboard lines with "SB:" — unwrap so the
     // quantity+name parse below still applies ("SB: 2 Duress" → 2 Duress).
+    // A bare "SB:" line unwraps to nothing — skip, don't emit a phantom card.
     trimmed = trimmed.replace(/^SB:\s*/i, '');
+    if (!trimmed) continue;
 
     // Bare section headers from Arena/MTGO exports ("Deck", "Sideboard",
     // "Commander") are not cards — skip instead of emitting a phantom 1-of.
