@@ -1,13 +1,20 @@
 // Shared Moxfield-import logic used by the deck-create import and the per-deck
 // card import. classifyMoxfieldCards is pure; resolveMissingToLibrary wraps
 // Scryfall to turn missing printings into collection-card insert rows.
+import { z } from 'zod';
 import {
   buildLibraryNameIndex,
   findLibraryName,
   isBasicLand,
   type ParsedMoxfieldCard,
-} from '@/lib/parseMoxfield'
-import { resolveCards, scryfallKey } from '@/lib/scryfall'
+} from '@/lib/parseMoxfield';
+import { resolveCards, scryfallKey } from '@/lib/scryfall';
+
+// Boards mirror Moxfield: main deck, sideboard, maybeboard. DeckCard.board
+// defaults to 'main'; the (deckId, cardName, board) unique key lets the same
+// card live in multiple boards of one deck.
+export const boardSchema = z.enum(['main', 'side', 'maybe']);
+export type Board = z.infer<typeof boardSchema>;
 
 export interface ClassifiedCards {
   present: Array<{ card: ParsedMoxfieldCard; canonical: string }>

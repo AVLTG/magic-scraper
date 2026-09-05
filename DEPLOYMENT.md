@@ -172,7 +172,7 @@ The cron job is already configured in `vercel.json` at the project root:
   "crons": [
     {
       "path": "/api/cron/sync-collections",
-      "schedule": "0 5 * * *"
+      "schedule": "0 5 */2 * *"
     }
   ]
 }
@@ -180,13 +180,13 @@ The cron job is already configured in `vercel.json` at the project root:
 
 Vercel reads this file on every deploy and registers the cron job automatically — **no manual steps required**.
 
-**What it does:** At 5:00 AM UTC (midnight EST) each day, Vercel calls `/api/cron/sync-collections`, which fetches the latest Moxfield collection data for every user and updates the database.
+**What it does:** At 5:00 AM UTC (midnight EST) every other day, Vercel calls `/api/cron/sync-collections`, which fetches the latest Moxfield collection data for every user and updates the database.
 
 **Hobby tier timing variance:** On the Vercel Hobby plan, cron jobs are invoked within a ±59 minute window of the scheduled time. The job may run anywhere from 05:00 to 05:59 UTC. This is expected behavior.
 
 **Authentication:** Vercel automatically sends an `Authorization: Bearer <CRON_SECRET>` header with each cron invocation. The `CRON_SECRET` env var must be set in Vercel for this to work.
 
-**Verify setup:** After deploying, go to **Vercel Dashboard > Project > Cron Jobs** — the `sync-collections` job should appear with schedule `0 5 * * *`.
+**Verify setup:** After deploying, go to **Vercel Dashboard > Project > Cron Jobs** — the `sync-collections` job should appear with schedule `0 5 */2 * *`.
 
 ---
 
@@ -230,9 +230,24 @@ Run through this checklist after your first deploy:
 - [ ] Admin panel shows an "Update All Collections" button
 - [ ] Click "Update All Collections" — sync runs and returns without error (may take 10-60 seconds per user)
 - [ ] Admin panel shows the user list (if users were seeded)
-- [ ] Go to **Vercel Dashboard > Project > Cron Jobs** — `sync-collections` is listed with schedule `0 5 * * *`
-- [ ] (Next morning) Check **Vercel Dashboard > Project > Logs** — confirm the cron ran and logged user update activity
+- [ ] Go to **Vercel Dashboard > Project > Cron Jobs** — `sync-collections` is listed with schedule `0 5 */2 * *`
+- [ ] (After the next scheduled run) Check **Vercel Dashboard > Project > Logs** — confirm the cron ran and logged user update activity
 - [ ] Go to **Vercel Dashboard > Project > Settings > Functions** — confirm Fluid Compute is enabled
+
+---
+
+## Production Schema Updates
+
+Local dev applies schema changes with `prisma db push`. Production Turso needs
+manual application — `prisma migrate deploy` is incompatible with the libsql adapter:
+
+```bash
+turso db shell <your-db-name> < prisma/migrations-manual/2026-09-05-decks-format-commander-board.sql
+```
+
+That file adds `decks.format`, `decks.commander`, and `deck_cards.board`
+(default `'main'`, existing rows backfilled). Re-running it is safe — the only
+errors on retry are benign "duplicate column name" notices.
 
 ---
 

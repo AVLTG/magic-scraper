@@ -66,9 +66,23 @@ describe('POST /api/decks/[id]/import', () => {
     expect(res.status).toBe(200)
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { deckId_cardName: { deckId: 'd1', cardName: 'Sol Ring' } },
+        where: { deckId_cardName_board: { deckId: 'd1', cardName: 'Sol Ring', board: 'main' } },
         update: { quantity: { increment: 2 } },
-        create: expect.objectContaining({ deckId: 'd1', cardName: 'Sol Ring', quantity: 2, set: 'C21', collectorNumber: '263' }),
+        create: expect.objectContaining({ deckId: 'd1', cardName: 'Sol Ring', quantity: 2, set: 'C21', collectorNumber: '263', board: 'main' }),
+      })
+    )
+  })
+
+  it('commit targets the requested board', async () => {
+    mockCollectionFindMany.mockResolvedValue([{ cardName: 'Sol Ring' }])
+    const res: any = await POST(
+      makeRequest({ text: '2 Sol Ring (C21) 263', dryRun: false, addMissingToLibrary: false, board: 'side' }),
+      params
+    )
+    expect(res.status).toBe(200)
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { deckId_cardName_board: { deckId: 'd1', cardName: 'Sol Ring', board: 'side' } },
       })
     )
   })

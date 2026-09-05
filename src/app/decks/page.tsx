@@ -20,11 +20,52 @@ export default function DecksPage() {
   // import flow: idle -> editing -> prompt (missing list) -> done
   const [showImport, setShowImport] = useState(false);
   const [importName, setImportName] = useState("");
+  const [importFormat, setImportFormat] = useState("");
+  const [importCommander, setImportCommander] = useState("");
   const [importText, setImportText] = useState("");
   const [importErrors, setImportErrors] = useState<ImportError[]>([]);
   const [missing, setMissing] = useState<MissingCard[] | null>(null);
+  const [missingChoiceBoards, setMissingChoiceBoards] = useState<{ side: string; maybe: string } | null>(null);
   const [importStatus, setImportStatus] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+
+  // URL fetch state — a share link prefills name/format/commander + boards
+  const [deckUrl, setDeckUrl] = useState("");
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
+  const [urlError, setUrlError] = useState("");
+
+  const fetchFromUrl = async () => {
+    setIsFetchingUrl(true);
+    setUrlError("");
+    try {
+      const res = await fetch("/api/decks/fetch-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: deckUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUrlError(typeof data.error === "string" ? data.error : "Failed to fetch deck");
+        return;
+      }
+      const d = data.deck;
+      setImportName(d.name ?? "");
+      setImportFormat(d.format ?? "");
+      setImportCommander(d.commander ?? "");
+      setImportText(d.main ?? "");
+      setMissing(null);
+      setMissingChoiceBoards(
+        d.side || d.maybe ? { side: d.side ?? "", maybe: d.maybe ?? "" } : null
+      );
+      setImportStatus(
+        [d.side?.trim() ? "sideboard" : null, d.maybe?.trim() ? "maybeboard" : null].filter(Boolean).length > 0
+          ? `Fetched “${d.name}” with ${[d.side?.trim() ? "sideboard" : null, d.maybe?.trim() ? "maybeboard" : null].filter(Boolean).join(" + ")} — they will import alongside the main deck.`
+          : `Fetched “${d.name}” — review the list below and import.`
+      );
+    } finally {
+      setIsFetchingUrl(false);
+    }
+  };
 
   const loadDecks = async () => {
     try {
@@ -59,41 +100,108 @@ export default function DecksPage() {
     await loadDecks();
   };
 
+  const dryRunBoard = async (text: string) => {
+    const res = await fetch("/api/decks/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: importName || "dry-run", text, dryRun: true }),
+    });
+    return res.json();
+  };
+
+  const commitBoard = async (deckId: string | null, text: string, board: string | null, addMissing: boolean) => {
+    const url = deckId ? `/api/decks/${deckId}/import` : "/api/decks/import";
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...(deckId
+          ? { text, board, dryRun: false, addMissingToLibrary: addMissing }
+          : {
+              name: importName,
+              text,
+              dryRun: false,
+              addMissingToLibrary: addMissing,
+              ...(importFormat.trim() ? { format: importFormat.trim() } : {}),
+              ...(importCommander.trim() ? { commander: importCommander.trim() } : {}),
+            }),
+      }),
+    });
+    return { res, data: await res.json() };
+  };
+
   const runImport = async (body: Record<string, unknown>) => {
     setIsImporting(true);
     setImportStatus("");
     try {
-      const res = await fetch("/api/decks/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: importName, text: importText, ...body }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const detail = Array.isArray(data.cards) ? `: ${data.cards.join(", ")}` : "";
-        setImportStatus(`${typeof data.error === "string" ? data.error : "Import failed"}${detail}`);
-        return;
-      }
       if (body.dryRun) {
-        setImportErrors(Array.isArray(data.errors) ? data.errors : []);
-        if (Array.isArray(data.missing) && data.missing.length > 0) {
-          setMissing(data.missing); // show the yes/no prompt
+        // Dry-run every non-empty board so the missing prompt covers all of them.
+        const boards = [
+          { key: "main", text: importText },
+          ...(missingChoiceBoards?.side?.trim() ? [{ key: "side", text: missingChoiceBoards.side }] : []),
+          ...(missingChoiceBoards?.maybe?.trim() ? [{ key: "maybe", text: missingChoiceBoards.maybe }] : []),
+        ];
+        const seen = new Map<string, MissingCard>();
+        let errors: ImportError[] = [];
+        for (const b of boards) {
+          const data = await dryRunBoard(b.text);
+          errors = errors.concat(Array.isArray(data.errors) ? data.errors : []);
+          for (const m of data.missing ?? []) {
+            const k = `${m.cardName.toLowerCase()}|${m.set}|${m.collectorNumber}`;
+            if (!seen.has(k)) seen.set(k, m);
+          }
+        }
+        setImportErrors(errors);
+        const allMissing = Array.from(seen.values());
+        if (allMissing.length > 0) {
+          setMissing(allMissing); // show the yes/no prompt
         } else {
           // nothing missing — commit immediately
           await runImport({ dryRun: false, addMissingToLibrary: false });
         }
         return;
       }
+      // ---- commit: main creates the deck, then side/maybe follow it ----
+      const addMissing = body.addMissingToLibrary === true;
+      const { res, data } = await commitBoard(null, importText, null, addMissing);
+      if (!res.ok) {
+        const detail = Array.isArray(data.cards) ? `: ${data.cards.join(", ")}` : "";
+        setImportStatus(`${typeof data.error === "string" ? data.error : "Import failed"}${detail}`);
+        return;
+      }
+      const deckId = data.deck?.id as string | undefined;
+      const extra: string[] = [];
+      if (deckId && missingChoiceBoards) {
+        for (const [board, text] of [["side", missingChoiceBoards.side], ["maybe", missingChoiceBoards.maybe]] as const) {
+          if (!text.trim()) continue;
+          const r = await commitBoard(deckId, text, board, addMissing);
+          if (!r.res.ok) {
+            extra.push(`${board}: ${typeof r.data.error === "string" ? r.data.error : "failed"}`);
+          }
+        }
+      }
+      if (extra.length > 0) {
+        setImportStatus(`Main deck imported, but ${extra.join("; ")} — add them from the deck page.`);
+      }
       // committed
-      setShowImport(false);
-      setImportName("");
-      setImportText("");
-      setMissing(null);
-      setImportErrors([]);
+      resetImport();
       await loadDecks();
     } finally {
       setIsImporting(false);
     }
+  };
+
+  const resetImport = () => {
+    setShowImport(false);
+    setImportName("");
+    setImportFormat("");
+    setImportCommander("");
+    setImportText("");
+    setDeckUrl("");
+    setUrlError("");
+    setMissing(null);
+    setMissingChoiceBoards(null);
+    setImportErrors([]);
   };
 
   if (isLoading) return <div className="py-8 text-muted">Loading…</div>;
@@ -144,14 +252,49 @@ export default function DecksPage() {
 
           {showImport && (
             <div className="rounded-lg border border-border bg-surface p-4 mb-8 space-y-3">
-              <input
-                type="text"
-                value={importName}
-                onChange={(e) => setImportName(e.target.value)}
-                placeholder="Deck name"
-                maxLength={100}
-                className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={deckUrl}
+                  onChange={(e) => setDeckUrl(e.target.value)}
+                  placeholder="Or paste a Moxfield share link (moxfield.com/decks/…)"
+                  className="flex-1 px-3 py-2 rounded-md border border-border bg-background text-foreground text-sm"
+                />
+                <button
+                  onClick={fetchFromUrl}
+                  disabled={isFetchingUrl || deckUrl.trim().length === 0}
+                  className="px-4 py-2 rounded-md border border-border text-foreground text-sm font-medium hover:bg-surface-hover disabled:opacity-50 cursor-pointer shrink-0"
+                >
+                  {isFetchingUrl ? "Fetching…" : "Fetch"}
+                </button>
+              </div>
+              {urlError && <p className="text-sm text-red-400">{urlError}</p>}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={importName}
+                  onChange={(e) => setImportName(e.target.value)}
+                  placeholder="Deck name"
+                  maxLength={100}
+                  className="flex-1 px-3 py-2 rounded-md border border-border bg-background text-foreground"
+                />
+                <input
+                  type="text"
+                  value={importFormat}
+                  onChange={(e) => setImportFormat(e.target.value)}
+                  placeholder="Format (optional)"
+                  maxLength={50}
+                  className="sm:w-40 px-3 py-2 rounded-md border border-border bg-background text-foreground"
+                />
+                <input
+                  type="text"
+                  value={importCommander}
+                  onChange={(e) => setImportCommander(e.target.value)}
+                  placeholder="Commander (optional)"
+                  maxLength={200}
+                  className="flex-1 px-3 py-2 rounded-md border border-border bg-background text-foreground"
+                />
+              </div>
               <textarea
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}

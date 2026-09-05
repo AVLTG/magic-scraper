@@ -38,11 +38,11 @@ export async function GET(request: NextRequest) {
     if (failed.length > 0) {
       const lines = failed.map(f => `- ${f.name}: ${f.error}`).join('\n')
       await sendDiscordAlert({
-        content: `⚠️ Nightly sync completed with ${failed.length} failure(s) (${succeeded.length} succeeded):\n${lines}`,
+        content: `⚠️ Sync completed with ${failed.length} failure(s) (${succeeded.length} succeeded):\n${lines}`,
       })
     } else {
       await sendDiscordAlert({
-        content: `✅ Nightly sync complete: ${succeeded.length} user(s) synced successfully`,
+        content: `✅ Sync complete: ${succeeded.length} user(s) synced successfully`,
       })
     }
     return Response.json({ success: true, succeeded: succeeded.length, failed: failed.length })
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     // Hard failure (e.g. DB unreachable) throws before the per-user loop, so no
     // ⚠️/✅ summary is sent. Alert explicitly so a total failure is never silent.
     await sendDiscordAlert({
-      content: `❌ Nightly sync crashed before completing: ${String(error)}`,
+      content: `❌ Sync crashed before completing: ${String(error)}`,
     }).catch((alertError) => {
       console.error('Failed to post cron-failure alert to Discord:', alertError)
     })

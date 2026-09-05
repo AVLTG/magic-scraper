@@ -16,6 +16,8 @@ const importSchema = z.object({
   text: z.string().min(1).max(100_000),
   dryRun: z.boolean().default(false),
   addMissingToLibrary: z.boolean().optional(),
+  format: z.string().trim().max(50).optional(),
+  commander: z.string().trim().max(200).optional(),
 });
 
 interface DeckCardDraft {
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, text, dryRun, addMissingToLibrary } = importSchema.parse(await request.json());
+    const { name, text, dryRun, addMissingToLibrary, format, commander } = importSchema.parse(await request.json());
 
     const { cards, errors } = parseMoxfieldText(text);
     const lib = await prisma.collectionCard.findMany({
@@ -115,6 +117,8 @@ export async function POST(request: Request) {
         data: {
           name,
           ownerUserId: session.userId,
+          format: format ?? null,
+          commander: commander ?? null,
           cards: { create: Array.from(deckCardMap.values()) },
         },
       });

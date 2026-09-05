@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
+import { groupDeckByType, computeDeckStats } from "@/lib/deckGroups";
 
 interface DeckCardRow {
   cardName: string;
@@ -9,11 +10,16 @@ interface DeckCardRow {
   set: string | null;
   collectorNumber: string | null;
   isFoil: boolean;
+  board: string;
+  typeLine: string | null;
+  scryfallId: string | null;
   inLibrary: boolean;
 }
 interface DeckDetail {
   id: string;
   name: string;
+  format: string | null;
+  commander: string | null;
   ownerName: string | null;
   isOwner: boolean;
   cards: DeckCardRow[];
@@ -31,8 +37,12 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
   const [nameDraft, setNameDraft] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
+  const [importBoard, setImportBoard] = useState("main");
   const [importMissing, setImportMissing] = useState<{ cardName: string }[] | null>(null);
   const [importBusy, setImportBusy] = useState(false);
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [formatDraft, setFormatDraft] = useState("");
+  const [commanderDraft, setCommanderDraft] = useState("");
 
   const loadDeck = useCallback(async () => {
     const res = await fetch(`/api/decks/${id}`);
@@ -97,7 +107,7 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
       const res = await fetch(`/api/decks/${id}/import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: importText, ...body }),
+        body: JSON.stringify({ text: importText, board: importBoard, ...body }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -117,6 +127,25 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const saveMeta = async () => {
+    setError("");
+    const res = await fetch(`/api/decks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        format: formatDraft.trim() ? formatDraft.trim() : null,
+        commander: commanderDraft.trim() ? commanderDraft.trim() : null,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(typeof data.error === "string" ? data.error : "Failed to save details");
+      return;
+    }
+    setEditingMeta(false);
+    await loadDeck();
+  };
+
   const handleDelete = async () => {
     if (!confirm(`Delete deck "${deck?.name}"? This cannot be undone.`)) return;
     const res = await fetch(`/api/decks/${id}`, { method: "DELETE" });
@@ -126,6 +155,74 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
 
   if (error && !deck) return <div className="py-8 text-red-400">{error}</div>;
   if (!deck) return <div className="py-8 text-muted">Loading…</div>;
+
+  const mainCards = deck.cards.filter((c) => c.board !== "side" && c.board !== "maybe");
+  const sideCards = deck.cards.filter((c) => c.board === "side");
+  const maybeCards = deck.cards.filter((c) => c.board === "maybe");
+  const groups = groupDeckByType(mainCards);
+  const stats = computeDeckStats(mainCards);
+  const libraryPct = stats.total > 0 ? Math.round((stats.inLibraryCount / stats.total) * 100) : 0;
+
+  const renderRows = (cards: DeckCardRow[]) => (
+    <div className="space-y-1">
+      {cards.map((c) => (
+        <div key={`${c.board}:${c.cardName}`} className="group flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm hover:border-accent/40 transition-colors">
+          {c.scryfallId && (
+            <div className="hidden md:group-hover:block fixed z-[9999] pointer-events-none">
+              <img
+                src={`https://api.scryfall.com/cards/${c.scryfallId}?format=image`}
+                alt={c.cardName}
+                loading="lazy"
+                className="w-64 rounded-lg shadow-2xl border border-border"
+                style={{ position: 'fixed', right: '20px', bottom: '20px' }}
+              />
+            </div>
+          )}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-medium truncate">{c.cardName}</span>
+            {c.set && <span className="text-xs text-muted">({c.set.toUpperCase()})</span>}
+            {c.isFoil && (
+              <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-medium">Foil</span>
+            )}
+            {!c.inLibrary && (
+              <span className="text-xs bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded" title="Not in the owner's library">
+                not in library
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {deck.isOwner ? (
+              <>
+                <button
+                  onClick={() => mutateCards({ setQuantity: [{ cardName: c.cardName, quantity: c.quantity - 1, board: c.board }] })}
+                  className="w-6 h-6 rounded border border-border text-muted hover:text-foreground cursor-pointer"
+                  aria-label={`Decrease ${c.cardName}`}
+                >
+                  −
+                </button>
+                <span className="font-mono text-xs w-6 text-center">x{c.quantity}</span>
+                <button
+                  onClick={() => mutateCards({ setQuantity: [{ cardName: c.cardName, quantity: c.quantity + 1, board: c.board }] })}
+                  className="w-6 h-6 rounded border border-border text-muted hover:text-foreground cursor-pointer"
+                  aria-label={`Increase ${c.cardName}`}
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => mutateCards({ remove: [{ cardName: c.cardName, board: c.board }] })}
+                  className="ml-2 text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                >
+                  Remove
+                </button>
+              </>
+            ) : (
+              <span className="font-mono text-xs">x{c.quantity}</span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   const inDeck = new Set(deck.cards.map((c) => c.cardName.toLowerCase()));
   const addable = library.filter(
@@ -173,10 +270,61 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
           </button>
         )}
       </div>
-      <p className="text-muted mb-6">
+      <p className="text-muted mb-2">
         {deck.isOwner ? "Your deck" : deck.ownerName ? `Owned by ${deck.ownerName}` : "Ownerless deck"} ·{" "}
-        {deck.cards.reduce((n, c) => n + c.quantity, 0)} cards
+        {stats.total} cards
+        {sideCards.length > 0 && ` · ${sideCards.reduce((n, c) => n + c.quantity, 0)} sideboard`}
+        {maybeCards.length > 0 && ` · ${maybeCards.reduce((n, c) => n + c.quantity, 0)} maybeboard`}
       </p>
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        {deck.format && (
+          <span className="text-xs font-medium bg-sky-500/15 text-sky-400 px-2 py-0.5 rounded-full">{deck.format}</span>
+        )}
+        {deck.commander && (
+          <span className="text-xs font-medium bg-violet-500/15 text-violet-300 px-2 py-0.5 rounded-full" title="Commander">
+            {deck.commander}
+          </span>
+        )}
+        {deck.isOwner && (
+          <button
+            onClick={() => {
+              setFormatDraft(deck.format ?? "");
+              setCommanderDraft(deck.commander ?? "");
+              setEditingMeta((v) => !v);
+            }}
+            className="text-xs text-accent hover:underline cursor-pointer"
+          >
+            {editingMeta ? "Cancel" : deck.format || deck.commander ? "Edit details" : "Add format / commander"}
+          </button>
+        )}
+      </div>
+
+      {deck.isOwner && editingMeta && (
+        <div className="flex flex-col sm:flex-row gap-2 mb-6">
+          <input
+            type="text"
+            value={formatDraft}
+            onChange={(e) => setFormatDraft(e.target.value)}
+            placeholder="Format (e.g. Commander)"
+            maxLength={50}
+            className="flex-1 px-3 py-2 rounded-md border border-border bg-surface text-foreground text-sm"
+          />
+          <input
+            type="text"
+            value={commanderDraft}
+            onChange={(e) => setCommanderDraft(e.target.value)}
+            placeholder="Commander"
+            maxLength={200}
+            className="flex-1 px-3 py-2 rounded-md border border-border bg-surface text-foreground text-sm"
+          />
+          <button
+            onClick={saveMeta}
+            className="px-4 py-2 rounded-md bg-accent text-white text-sm font-medium hover:bg-accent-hover cursor-pointer"
+          >
+            Save
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 mb-6">
@@ -187,53 +335,55 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
       {deck.cards.length === 0 ? (
         <p className="text-muted text-sm mb-8">No cards yet{deck.isOwner ? " — add some from your library below." : "."}</p>
       ) : (
-        <div className="space-y-1 mb-8">
-          {deck.cards.map((c) => (
-            <div key={c.cardName} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="font-medium truncate">{c.cardName}</span>
-                {c.set && <span className="text-xs text-muted">({c.set.toUpperCase()})</span>}
-                {c.isFoil && (
-                  <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-medium">Foil</span>
-                )}
-                {!c.inLibrary && (
-                  <span className="text-xs bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded" title="Not in the owner's library">
-                    not in library
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {deck.isOwner ? (
-                  <>
-                    <button
-                      onClick={() => mutateCards({ setQuantity: [{ cardName: c.cardName, quantity: c.quantity - 1 }] })}
-                      className="w-6 h-6 rounded border border-border text-muted hover:text-foreground cursor-pointer"
-                      aria-label={`Decrease ${c.cardName}`}
-                    >
-                      −
-                    </button>
-                    <span className="font-mono text-xs w-6 text-center">x{c.quantity}</span>
-                    <button
-                      onClick={() => mutateCards({ setQuantity: [{ cardName: c.cardName, quantity: c.quantity + 1 }] })}
-                      className="w-6 h-6 rounded border border-border text-muted hover:text-foreground cursor-pointer"
-                      aria-label={`Increase ${c.cardName}`}
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => mutateCards({ remove: [c.cardName] })}
-                      className="ml-2 text-xs text-red-400 hover:text-red-300 cursor-pointer"
-                    >
-                      Remove
-                    </button>
-                  </>
-                ) : (
-                  <span className="font-mono text-xs">x{c.quantity}</span>
-                )}
-              </div>
+        <>
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <span className="text-sm font-medium bg-accent-muted text-accent px-2.5 py-1 rounded-full">
+              {stats.total} cards · {stats.unique} unique
+            </span>
+            <span
+              className={`text-sm font-medium px-2.5 py-1 rounded-full ${libraryPct === 100 ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}`}
+              title={`${stats.inLibraryCount} of ${stats.total} cards are in the owner's library`}
+            >
+              {libraryPct}% in library
+            </span>
+            {stats.foilCount > 0 && (
+              <span className="text-sm font-medium bg-amber-500/15 text-amber-400 px-2.5 py-1 rounded-full">
+                {stats.foilCount} foil
+              </span>
+            )}
+            {stats.byGroup.map((g) => (
+              <span key={g.group} className="text-xs text-muted bg-surface border border-border px-2 py-1 rounded-full">
+                {g.group} · {g.count}
+              </span>
+            ))}
+          </div>
+          <div className="space-y-6 mb-8">
+            {groups.map((section) => (
+              <section key={section.group}>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted mb-2">
+                  {section.group} <span className="font-mono">({section.count})</span>
+                </h2>
+                {renderRows(section.cards)}
+              </section>
+            ))}
+          </div>
+          {sideCards.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted mb-2">
+                Sideboard <span className="font-mono">({sideCards.reduce((n, c) => n + c.quantity, 0)})</span>
+              </h2>
+              {renderRows(sideCards)}
             </div>
-          ))}
-        </div>
+          )}
+          {maybeCards.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted mb-2">
+                Maybeboard <span className="font-mono">({maybeCards.reduce((n, c) => n + c.quantity, 0)})</span>
+              </h2>
+              {renderRows(maybeCards)}
+            </div>
+          )}
+        </>
       )}
 
       {deck.isOwner && (
@@ -253,13 +403,25 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
                 className="w-full h-40 p-3 rounded-md border border-border bg-background text-foreground font-mono text-sm"
               />
               {importMissing === null ? (
-                <button
-                  onClick={() => runImport({ dryRun: true })}
-                  disabled={importBusy || importText.trim().length === 0}
-                  className="px-4 py-2 rounded-md bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-50 cursor-pointer"
-                >
-                  {importBusy ? "Checking…" : "Import"}
-                </button>
+                <div className="flex gap-2">
+                  <select
+                    value={importBoard}
+                    onChange={(e) => setImportBoard(e.target.value)}
+                    className="px-3 py-2 rounded-md border border-border bg-background text-foreground text-sm"
+                    aria-label="Import into board"
+                  >
+                    <option value="main">Main deck</option>
+                    <option value="side">Sideboard</option>
+                    <option value="maybe">Maybeboard</option>
+                  </select>
+                  <button
+                    onClick={() => runImport({ dryRun: true })}
+                    disabled={importBusy || importText.trim().length === 0}
+                    className="px-4 py-2 rounded-md bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-50 cursor-pointer"
+                  >
+                    {importBusy ? "Checking…" : "Import"}
+                  </button>
+                </div>
               ) : (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
                   <p className="text-sm text-amber-400 font-medium">
