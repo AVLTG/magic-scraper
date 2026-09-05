@@ -43,6 +43,9 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
   const [editingMeta, setEditingMeta] = useState(false);
   const [formatDraft, setFormatDraft] = useState("");
   const [commanderDraft, setCommanderDraft] = useState("");
+  // Compact grid: controls live behind a click. One expanded card at a time.
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const cardKey = (c: DeckCardRow) => `${c.board}:${c.cardName}`;
 
   const loadDeck = useCallback(async () => {
     const res = await fetch(`/api/decks/${id}`);
@@ -164,35 +167,50 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
   const libraryPct = stats.total > 0 ? Math.round((stats.inLibraryCount / stats.total) * 100) : 0;
 
   const renderRows = (cards: DeckCardRow[]) => (
-    <div className="space-y-1">
-      {cards.map((c) => (
-        <div key={`${c.board}:${c.cardName}`} className="group flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm hover:border-accent/40 transition-colors">
-          {c.scryfallId && (
-            <div className="hidden md:group-hover:block fixed z-[9999] pointer-events-none">
-              <img
-                src={`https://api.scryfall.com/cards/${c.scryfallId}?format=image`}
-                alt={c.cardName}
-                loading="lazy"
-                className="w-64 rounded-lg shadow-2xl border border-border"
-                style={{ position: 'fixed', right: '20px', bottom: '20px' }}
-              />
-            </div>
-          )}
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-medium truncate">{c.cardName}</span>
-            {c.set && <span className="text-xs text-muted">({c.set.toUpperCase()})</span>}
-            {c.isFoil && (
-              <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-medium">Foil</span>
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5">
+      {cards.map((c) => {
+        const key = cardKey(c);
+        const expanded = expandedKey === key;
+        return (
+          <div
+            key={key}
+            onClick={() => setExpandedKey(expanded ? null : key)}
+            className={`group rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors ${expanded ? "border-accent/60 bg-surface" : "border-border hover:border-accent/40"}`}
+            title={deck.isOwner ? "Click to adjust quantity" : undefined}
+          >
+            {c.scryfallId && (
+              <div className="hidden md:group-hover:block fixed z-[9999] pointer-events-none">
+                <img
+                  src={`https://api.scryfall.com/cards/${c.scryfallId}?format=image`}
+                  alt={c.cardName}
+                  loading="lazy"
+                  className="w-64 rounded-lg shadow-2xl border border-border"
+                  style={{ position: 'fixed', right: '20px', bottom: '20px' }}
+                />
+              </div>
             )}
-            {!c.inLibrary && (
-              <span className="text-xs bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded" title="Not in the owner's library">
-                not in library
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="font-medium truncate">
+                {c.cardName}
+                {c.set && <span className="text-xs text-muted font-normal"> ({c.set.toUpperCase()})</span>}
               </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {deck.isOwner ? (
-              <>
+              <span className="flex items-center gap-1 shrink-0">
+                {c.isFoil && (
+                  <span className="text-[10px] bg-amber-500/15 text-amber-400 px-1 py-px rounded font-medium">Foil</span>
+                )}
+                {!c.inLibrary && (
+                  <span className="text-[10px] bg-red-500/15 text-red-400 px-1 py-px rounded" title="Not in the owner's library">
+                    !
+                  </span>
+                )}
+                <span className="font-mono text-xs text-muted">x{c.quantity}</span>
+              </span>
+            </div>
+            {expanded && deck.isOwner && (
+              <div
+                className="flex items-center gap-2 pt-1.5 mt-1.5 border-t border-border"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   onClick={() => mutateCards({ setQuantity: [{ cardName: c.cardName, quantity: c.quantity - 1, board: c.board }] })}
                   className="w-6 h-6 rounded border border-border text-muted hover:text-foreground cursor-pointer"
@@ -200,7 +218,6 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
                 >
                   −
                 </button>
-                <span className="font-mono text-xs w-6 text-center">x{c.quantity}</span>
                 <button
                   onClick={() => mutateCards({ setQuantity: [{ cardName: c.cardName, quantity: c.quantity + 1, board: c.board }] })}
                   className="w-6 h-6 rounded border border-border text-muted hover:text-foreground cursor-pointer"
@@ -210,17 +227,20 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
                 </button>
                 <button
                   onClick={() => mutateCards({ remove: [{ cardName: c.cardName, board: c.board }] })}
-                  className="ml-2 text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                  className="ml-auto text-xs text-red-400 hover:text-red-300 cursor-pointer"
                 >
                   Remove
                 </button>
-              </>
-            ) : (
-              <span className="font-mono text-xs">x{c.quantity}</span>
+              </div>
+            )}
+            {expanded && !deck.isOwner && (
+              <p className="text-xs text-muted pt-1 mt-1 border-t border-border">
+                {!c.inLibrary ? "Not in the owner's library." : c.typeLine ?? ""}
+              </p>
             )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 
