@@ -7,6 +7,7 @@ import type { Product } from "@/types/product";
 export default function SearchLGS() {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<Product[]>([]);
+    const [resultsFor, setResultsFor] = useState("");
     const [error, setError] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
     const [failedStores, setFailedStores] = useState<string[]>([]);
@@ -19,6 +20,10 @@ export default function SearchLGS() {
         setIsLoading(true);
         setError("");
         setFailedStores([]);
+        // Clear previous results immediately: a failed/slow search must never
+        // leave another query's cards on screen looking like mixed results.
+        setResults([]);
+        setResultsFor("");
 
         try {
             const response = await fetch("/api/scrapeLGS", {
@@ -37,6 +42,7 @@ export default function SearchLGS() {
                 failedStores?: string[];
             };
             setResults(data.products || []);
+            setResultsFor(trimmed);
             setFailedStores(data.failedStores || []);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -94,7 +100,13 @@ export default function SearchLGS() {
             )}
 
             {results.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <>
+                    {resultsFor && (
+                        <p className="text-sm text-muted mb-4">
+                            {results.length} result{results.length !== 1 ? "s" : ""} for &ldquo;{resultsFor}&rdquo;
+                        </p>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {results.map((product) => (
                         <a
                             key={product.link}
@@ -123,7 +135,8 @@ export default function SearchLGS() {
                             </div>
                         </a>
                     ))}
-                </div>
+                    </div>
+                </>
             )}
         </div>
     );
