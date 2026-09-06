@@ -1,6 +1,7 @@
 import "server-only";
 import type { Browser } from "puppeteer-core";
 import type { Product, ScrapeCardProps } from "@/types/product";
+import { awaitGridOrEmpty } from "./emptyState";
 
 export async function scrapeETB({ card, browser }: ScrapeCardProps & { browser: Browser }): Promise<Product[]> {
     const cardUrl = card.toLowerCase().replace(/\s+/g, '-');
@@ -10,7 +11,9 @@ export async function scrapeETB({ card, browser }: ScrapeCardProps & { browser: 
 
     try {
         await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('.store-pass-product', { timeout: 1000 });
+        if (!(await awaitGridOrEmpty(page, '.store-pass-product', 8000, 'ETB', card))) {
+            return [];
+        }
 
         // Click the "In Stock Only" filter
         try {
@@ -28,7 +31,11 @@ export async function scrapeETB({ card, browser }: ScrapeCardProps & { browser: 
             console.log('In Stock filter not found, proceeding without it');
         }
 
-        await page.waitForSelector('.store-pass-product', { timeout: 1000 });
+        // The In-Stock click can filter every variant out — same empty-state
+        // rule applies as the initial wait.
+        if (!(await awaitGridOrEmpty(page, '.store-pass-product', 8000, 'ETB', card))) {
+            return [];
+        }
 
         await page.evaluate(async () => {
             await new Promise<void>((resolve) => {
