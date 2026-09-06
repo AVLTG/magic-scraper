@@ -5,6 +5,7 @@ import { getSession } from '@/lib/session';
 import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { buildLibraryNameIndex, findLibraryName, normalizeCardName, isBasicLand } from '@/lib/parseMoxfield';
 import { boardSchema, type Board } from '@/lib/deckImport';
+import { enrichDeckCards } from '@/lib/deckEnrich';
 
 const addSchema = z.object({
   cardName: z.string().trim().min(1).max(200),
@@ -28,6 +29,10 @@ const bodySchema = z.object({
     .array(z.object({ cardName: z.string().trim().min(1).max(200), quantity: z.number().int().min(0).max(999), board: boardSchema.default('main') }))
     .max(500)
     .optional(),
+  // Proxies and borrowed cards: add names not in the owner's library. They
+  // show as not-in-library (lowering coverage honestly) instead of being
+  // rejected or silently added to the library.
+  allowUnowned: z.boolean().default(false),
 });
 
 export async function PUT(
@@ -56,6 +61,7 @@ export async function PUT(
     const body = bodySchema.parse(await request.json());
 
     // Adds must come from the owner's library; store the canonical library name.
+    // With allowUnowned (proxies/borrowed), unknown names are stored as typed.
     let canonicalAdds: Array<z.infer<typeof addSchema> & { canonicalName: string }> = [];
     if (body.add && body.add.length > 0) {
       const lib = await prisma.collectionCard.findMany({
@@ -70,7 +76,10 @@ export async function PUT(
           return { ...a, canonicalName: a.cardName };
         }
         const canonicalName = findLibraryName(libIndex, a.cardName);
-        if (!canonicalName) unknown.push(a.cardName);
+        if (!canonicalName) {
+          if (body.allowUnowned) return { ...a, canonicalName: a.cardName.trim() };
+          unknown.push(a.cardName);
+        }
         return { ...a, canonicalName: canonicalName ?? a.cardName };
       });
       if (unknown.length > 0) {
@@ -132,6 +141,16 @@ export async function PUT(
       where: { deckId: id },
       orderBy: { cardName: 'asc' },
     });
+
+    // Best-effort mana curve data for newly added rows — never fails the update.
+    if (canonicalAdds.length > 0) {
+      try {
+        await enrichDeckCards(id);
+      } catch (error) {
+        console.error('Post-update enrich failed:', error);
+      }
+    }
+
     return NextResponse.json({
       cards: cards.map((c) => ({
         cardName: c.cardName,

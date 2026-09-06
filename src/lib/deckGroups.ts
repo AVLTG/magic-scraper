@@ -66,11 +66,12 @@ export interface DeckStats {
   unique: number;
   foilCount: number;
   inLibraryCount: number;
+  missingDataCount: number;
   byGroup: { group: DeckGroupName; count: number }[];
 }
 
 export function computeDeckStats(
-  cards: Array<GroupableCard & { isFoil?: boolean; inLibrary?: boolean }>
+  cards: Array<GroupableCard & { isFoil?: boolean; inLibrary?: boolean; cmc?: number | null }>
 ): DeckStats {
   const groups = groupDeckByType(cards);
   return {
@@ -78,6 +79,53 @@ export function computeDeckStats(
     unique: cards.length,
     foilCount: cards.filter((c) => c.isFoil).reduce((n, c) => n + c.quantity, 0),
     inLibraryCount: cards.filter((c) => c.inLibrary).reduce((n, c) => n + c.quantity, 0),
+    missingDataCount: cards.filter((c) => c.cmc === null || c.cmc === undefined).reduce((n, c) => n + c.quantity, 0),
     byGroup: groups.map((g) => ({ group: g.group, count: g.count })),
   };
+}
+
+export interface CurveBucket {
+  label: string;
+  count: number;
+}
+
+/** Mana curve over main-deck cards with known cmc: buckets 0–6 then 7+. */
+export function manaCurve(
+  cards: Array<GroupableCard & { cmc?: number | null }>
+): CurveBucket[] {
+  const buckets = [0, 0, 0, 0, 0, 0, 0, 0];
+  for (const c of cards) {
+    if (c.cmc === null || c.cmc === undefined) continue;
+    const idx = Math.min(7, Math.max(0, Math.floor(c.cmc)));
+    buckets[idx] += c.quantity;
+  }
+  return buckets.map((count, i) => ({ label: i === 7 ? "7+" : String(i), count }));
+}
+
+export interface ColorSlice {
+  color: "W" | "U" | "B" | "R" | "G" | "C";
+  count: number;
+}
+
+/** Color breakdown by color_identity (C = colorless, incl. lands). */
+export function colorBreakdown(
+  cards: Array<GroupableCard & { colors?: string | null; cmc?: number | null }>
+): ColorSlice[] {
+  const counts: Record<ColorSlice["color"], number> = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+  for (const c of cards) {
+    const colors = (c.colors ?? "").toUpperCase();
+    if (!colors) {
+      counts.C += c.quantity;
+      continue;
+    }
+    let matched = false;
+    for (const col of ["W", "U", "B", "R", "G"] as const) {
+      if (colors.includes(col)) {
+        counts[col] += c.quantity;
+        matched = true;
+      }
+    }
+    if (!matched) counts.C += c.quantity;
+  }
+  return (Object.keys(counts) as ColorSlice["color"][]).map((color) => ({ color, count: counts[color] }));
 }

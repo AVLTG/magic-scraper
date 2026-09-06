@@ -24,6 +24,7 @@ describe('resolveCards', () => {
     expect(found.get(scryfallKey('AFR', '261'))).toEqual({
       name: 'Treasure Vault', scryfallId: 'sc1', set: 'afr',
       setName: 'Adventures in the Forgotten Realms', typeLine: 'Artifact Land', collectorNumber: '261',
+      manaCost: '', cmc: 0, colors: '',
     })
     expect(notFound).toEqual([{ set: 'xxx', collectorNumber: '999' }])
     const body = JSON.parse(mockFetch.mock.calls[0][1].body)
