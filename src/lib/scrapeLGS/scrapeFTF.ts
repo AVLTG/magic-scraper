@@ -1,7 +1,7 @@
 import "server-only";
 import type { Browser } from "puppeteer-core";
 import type { Product, ScrapeCardProps } from "@/types/product";
-import { pageShowsNoResults } from "./emptyState";
+import { awaitGridOrEmpty } from "./emptyState";
 
 export async function scrapeFTF({ card, browser }: ScrapeCardProps & { browser: Browser }): Promise<Product[]> {
     const cardUrl = card.toLowerCase().replace(/\s+/g, '-');
@@ -11,20 +11,11 @@ export async function scrapeFTF({ card, browser }: ScrapeCardProps & { browser: 
 
     try {
         await page.goto(url, { waitUntil: 'domcontentloaded' });
-        try {
-            await page.waitForSelector('.bb-card-wrapper', { timeout: 8000 });
-        } catch (selectorError) {
-            // A search with no matches renders no grid — that is an empty
-            // result, not a store failure. Only rethrow when the page shows
-            // no empty-state (i.e. we are likely blocked).
-            const bodyText = await page
-                .evaluate(() => document.body.innerText.slice(0, 2000))
-                .catch(() => "");
-            if (pageShowsNoResults(bodyText)) {
-                console.log(`FTF: no results for "${card}"`);
-                return [];
-            }
-            throw selectorError;
+        // A search with no matches renders no grid — empty result, not store
+        // failure. awaitGridOrEmpty rethrows only when the page shows no
+        // empty-state (i.e. we are likely blocked).
+        if (!(await awaitGridOrEmpty(page, '.bb-card-wrapper', 8000, 'FTF', card))) {
+            return [];
         }
 
         await page.evaluate(async () => {
