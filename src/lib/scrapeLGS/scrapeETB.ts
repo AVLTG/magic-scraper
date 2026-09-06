@@ -1,6 +1,7 @@
 import "server-only";
 import type { Browser } from "puppeteer-core";
 import type { Product, ScrapeCardProps } from "@/types/product";
+import { pageShowsNoResults } from "./emptyState";
 
 export async function scrapeETB({ card, browser }: ScrapeCardProps & { browser: Browser }): Promise<Product[]> {
     const cardUrl = card.toLowerCase().replace(/\s+/g, '-');
@@ -10,7 +11,20 @@ export async function scrapeETB({ card, browser }: ScrapeCardProps & { browser: 
 
     try {
         await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('.store-pass-product', { timeout: 1000 });
+        try {
+            await page.waitForSelector('.store-pass-product', { timeout: 8000 });
+        } catch (selectorError) {
+            // No grid can mean "no matches" rather than "blocked" — only fail
+            // the store when the page shows no empty-state.
+            const bodyText = await page
+                .evaluate(() => document.body.innerText.slice(0, 2000))
+                .catch(() => "");
+            if (pageShowsNoResults(bodyText)) {
+                console.log(`ETB: no results for "${card}"`);
+                return [];
+            }
+            throw selectorError;
+        }
 
         // Click the "In Stock Only" filter
         try {
@@ -28,7 +42,7 @@ export async function scrapeETB({ card, browser }: ScrapeCardProps & { browser: 
             console.log('In Stock filter not found, proceeding without it');
         }
 
-        await page.waitForSelector('.store-pass-product', { timeout: 1000 });
+        await page.waitForSelector('.store-pass-product', { timeout: 8000 });
 
         await page.evaluate(async () => {
             await new Promise<void>((resolve) => {
