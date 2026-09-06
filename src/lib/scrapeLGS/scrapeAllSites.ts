@@ -54,7 +54,17 @@ export async function scrapeAllSites(
         );
       }
     });
-    await Promise.all(healthWrites);
+    // Health is DB-backed (shared across serverless instances) — best-effort:
+    // a failed observability write must never 500 an otherwise good search.
+    const healthResults = await Promise.allSettled(healthWrites);
+    for (let i = 0; i < healthResults.length; i++) {
+      if (healthResults[i].status === "rejected") {
+        console.error(
+          `Health write failed for ${storeNames[i]}:`,
+          (healthResults[i] as PromiseRejectedResult).reason
+        );
+      }
+    }
 
     return { products, failedStores };
   } finally {
