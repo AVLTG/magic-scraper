@@ -89,13 +89,15 @@ export interface CurveBucket {
   count: number;
 }
 
-/** Mana curve over main-deck cards with known cmc: buckets 0–6 then 7+. */
+/** Mana curve over main-deck cards with known cmc: buckets 0–6 then 7+.
+ *  Lands are excluded — they would all pile up at 0 and drown the signal. */
 export function manaCurve(
-  cards: Array<GroupableCard & { cmc?: number | null }>
+  cards: Array<GroupableCard & { cmc?: number | null; typeLine?: string | null }>
 ): CurveBucket[] {
   const buckets = [0, 0, 0, 0, 0, 0, 0, 0];
   for (const c of cards) {
     if (c.cmc === null || c.cmc === undefined) continue;
+    if ((c.typeLine ?? "").toLowerCase().includes("land")) continue;
     const idx = Math.min(7, Math.max(0, Math.floor(c.cmc)));
     buckets[idx] += c.quantity;
   }

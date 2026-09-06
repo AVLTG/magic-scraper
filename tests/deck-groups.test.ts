@@ -78,6 +78,16 @@ describe('manaCurve', () => {
     expect(curve.map((b) => b.count)).toEqual([4, 4, 2, 0, 0, 0, 0, 1]);
     expect(curve.map((b) => b.label)).toEqual(['0', '1', '2', '3', '4', '5', '6', '7+']);
   });
+
+  it('excludes lands so they do not pile up at 0', () => {
+    const curve = manaCurve([
+      { cardName: 'Forest', quantity: 10, cmc: 0, typeLine: 'Basic Land — Forest' },
+      { cardName: 'Dryad Arbor', quantity: 1, cmc: 0, typeLine: 'Land Creature — Dryad' },
+      { cardName: 'Bolt', quantity: 4, cmc: 1, typeLine: 'Instant' },
+    ]);
+    expect(curve[0].count).toBe(0);
+    expect(curve[1].count).toBe(4);
+  });
 });
 
 describe('colorBreakdown', () => {
