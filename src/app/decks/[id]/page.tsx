@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
-import { groupDeckByType, computeDeckStats } from "@/lib/deckGroups";
+import { groupDeckByType, computeDeckStats, manaCurve, colorBreakdown } from "@/lib/deckGroups";
 
 interface DeckCardRow {
   cardName: string;
@@ -11,6 +11,9 @@ interface DeckCardRow {
   collectorNumber: string | null;
   isFoil: boolean;
   board: string;
+  cmc: number | null;
+  manaCost: string | null;
+  colors: string | null;
   typeLine: string | null;
   scryfallId: string | null;
   inLibrary: boolean;
@@ -46,6 +49,40 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
   // Compact grid: controls live behind a click. One expanded card at a time.
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const cardKey = (c: DeckCardRow) => `${c.board}:${c.cardName}`;
+  // Unowned (proxy/borrowed) add + card-data refresh
+  const [unownedName, setUnownedName] = useState("");
+  const [unownedQty, setUnownedQty] = useState("1");
+  const [enrichBusy, setEnrichBusy] = useState(false);
+  const [enrichNote, setEnrichNote] = useState("");
+
+  const refreshCardData = async () => {
+    setEnrichBusy(true);
+    setEnrichNote("");
+    try {
+      const res = await fetch(`/api/decks/${id}/enrich`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setEnrichNote(typeof data.error === "string" ? data.error : "Refresh failed");
+        return;
+      }
+      if (data.unresolved?.length > 0) {
+        setEnrichNote(`Updated ${data.enriched} cards; Scryfall doesn't know: ${data.unresolved.join(", ")}`);
+      }
+      await loadDeck();
+    } finally {
+      setEnrichBusy(false);
+    }
+  };
+
+  const addUnowned = async () => {
+    const name = unownedName.trim();
+    const qty = Math.max(1, Math.min(999, parseInt(unownedQty, 10) || 1));
+    if (!name) return;
+    setError("");
+    await mutateCards({ add: [{ cardName: name, quantity: qty }], allowUnowned: true });
+    setUnownedName("");
+    setUnownedQty("1");
+  };
 
   const loadDeck = useCallback(async () => {
     const res = await fetch(`/api/decks/${id}`);
@@ -164,6 +201,9 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
   const maybeCards = deck.cards.filter((c) => c.board === "maybe");
   const groups = groupDeckByType(mainCards);
   const stats = computeDeckStats(mainCards);
+  const curve = manaCurve(mainCards);
+  const colors = colorBreakdown(mainCards).filter((s) => s.count > 0);
+  const curveMax = Math.max(1, ...curve.map((b) => b.count));
   const libraryPct = stats.total > 0 ? Math.round((stats.inLibraryCount / stats.total) * 100) : 0;
 
   const renderRows = (cards: DeckCardRow[]) => (
@@ -385,6 +425,39 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
                 {g.group} · {g.count}
               </span>
             ))}
+            {colors.map((s) => (
+              <span key={s.color} className="text-xs font-mono bg-surface border border-border px-2 py-1 rounded-full" title={`${s.count} ${s.color === "C" ? "colorless" : s.color} cards`}>
+                {s.color} · {s.count}
+              </span>
+            ))}
+          </div>
+          <div className="rounded-lg border border-border bg-surface p-4 mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Mana curve</h2>
+              {deck.isOwner && stats.missingDataCount > 0 && (
+                <button
+                  onClick={refreshCardData}
+                  disabled={enrichBusy}
+                  className="text-xs text-accent hover:underline disabled:opacity-50 cursor-pointer"
+                >
+                  {enrichBusy ? "Refreshing…" : `Refresh ${stats.missingDataCount} missing`}
+                </button>
+              )}
+            </div>
+            {enrichNote && <p className="text-xs text-amber-400 mb-2">{enrichNote}</p>}
+            <div className="flex items-end gap-1.5 h-24">
+              {curve.map((b) => (
+                <div key={b.label} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+                  <span className="text-[10px] font-mono text-muted">{b.count > 0 ? b.count : ""}</span>
+                  <div
+                    className="w-full rounded-t bg-accent/70 min-h-[2px]"
+                    style={{ height: `${Math.max(3, (b.count / curveMax) * 100)}%` }}
+                    title={`${b.count} cards at ${b.label}`}
+                  />
+                  <span className="text-[10px] font-mono text-muted">{b.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="space-y-6 mb-8">
             {groups.map((section) => (
@@ -495,6 +568,36 @@ export default function DeckDetailPage({ params }: { params: Promise<{ id: strin
               </button>
             ))}
             {addableUnique.length === 0 && <p className="text-sm text-muted px-3 py-2">No matching library cards.</p>}
+          </div>
+          <div className="mt-3 pt-3 border-t border-border">
+            <p className="text-xs text-muted mb-2">Proxy or borrowed card? Add it unowned — it counts against library coverage.</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={unownedName}
+                onChange={(e) => setUnownedName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUnowned(); } }}
+                placeholder="Card name…"
+                maxLength={200}
+                className="flex-1 px-3 py-2 rounded-md border border-border bg-background text-foreground text-sm"
+              />
+              <input
+                type="number"
+                value={unownedQty}
+                onChange={(e) => setUnownedQty(e.target.value)}
+                min={1}
+                max={999}
+                aria-label="Quantity"
+                className="w-16 px-2 py-2 rounded-md border border-border bg-background text-foreground text-sm"
+              />
+              <button
+                onClick={addUnowned}
+                disabled={unownedName.trim().length === 0}
+                className="px-3 py-2 rounded-md border border-border text-sm text-foreground hover:bg-surface-hover disabled:opacity-50 cursor-pointer shrink-0"
+              >
+                Add unowned
+              </button>
+            </div>
           </div>
         </div>
       )}

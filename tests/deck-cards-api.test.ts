@@ -161,4 +161,23 @@ describe('PUT /api/decks/[id]/cards', () => {
       })
     )
   })
+
+  it('400s unknown cards by default but stores them with allowUnowned', async () => {
+    mockGetSession.mockResolvedValue(MEMBER)
+    mockDeckFindUnique.mockResolvedValue(OWNED)
+    mockCollectionFindMany.mockResolvedValue([])
+    const denied: any = await PUT(makeRequest({ add: [{ cardName: 'Black Lotus' }] }), params)
+    expect(denied.status).toBe(400)
+    expect(mockUpsert).not.toHaveBeenCalled()
+    const allowed: any = await PUT(
+      makeRequest({ add: [{ cardName: 'Black Lotus', quantity: 1 }], allowUnowned: true }),
+      params
+    )
+    expect(allowed.status).toBe(200)
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { deckId_cardName_board: { deckId: 'd1', cardName: 'Black Lotus', board: 'main' } },
+      })
+    )
+  })
 })

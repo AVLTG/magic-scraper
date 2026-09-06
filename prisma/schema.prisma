@@ -150,6 +150,11 @@ model DeckCard {
   collectorNumber String?
   isFoil          Boolean @default(false)
   board           String  @default("main")
+  // Scryfall enrichment for mana curve / color stats. Nullable so existing
+  // rows work; backfilled on import and via the deck refresh action.
+  cmc             Float?
+  manaCost        String?
+  colors          String? @default("")
 
   deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
 

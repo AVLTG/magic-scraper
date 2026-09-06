@@ -5,6 +5,7 @@ import { getSession } from '@/lib/session';
 import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { parseMoxfieldText, buildLibraryNameIndex, normalizeCardName, type ParsedMoxfieldCard } from '@/lib/parseMoxfield';
 import { classifyMoxfieldCards, resolveMissingToLibrary, boardSchema } from '@/lib/deckImport';
+import { enrichDeckCards } from '@/lib/deckEnrich';
 
 const importSchema = z.object({
   text: z.string().min(1).max(100_000),
@@ -110,6 +111,14 @@ export async function POST(
     });
 
     const updated = await prisma.deckCard.findMany({ where: { deckId: id }, orderBy: { cardName: 'asc' } });
+
+    // Best-effort mana curve data — never fails the import.
+    try {
+      await enrichDeckCards(id);
+    } catch (error) {
+      console.error('Post-import enrich failed:', error);
+    }
+
     return NextResponse.json({
       cards: updated.map((c) => ({ cardName: c.cardName, quantity: c.quantity, set: c.set, collectorNumber: c.collectorNumber, isFoil: c.isFoil, board: c.board })),
       addedToLibrary: libraryInserts.length,

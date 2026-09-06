@@ -10,6 +10,7 @@ import {
   type ParsedMoxfieldCard,
 } from '@/lib/parseMoxfield';
 import { classifyMoxfieldCards, resolveMissingToLibrary } from '@/lib/deckImport';
+import { enrichDeckCards } from '@/lib/deckEnrich';
 
 const importSchema = z.object({
   name: z.string().trim().min(1, 'name is required').max(100, 'name too long'),
@@ -127,6 +128,13 @@ export async function POST(request: Request) {
     // Total card count (summed quantities), consistent with GET /api/decks and
     // the deck detail page — not the number of distinct rows.
     const cardCount = Array.from(deckCardMap.values()).reduce((n, c) => n + c.quantity, 0);
+
+    // Best-effort mana curve data — never fails the import.
+    try {
+      await enrichDeckCards(deck.id);
+    } catch (error) {
+      console.error('Post-import enrich failed:', error);
+    }
 
     return NextResponse.json(
       {
