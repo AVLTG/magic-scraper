@@ -95,6 +95,18 @@ model SyncLog {
   @@map("sync_logs")
 }
 
+// Last known scrape outcome per LGS store. The old in-memory Map reset on
+// every serverless cold start (and was never shared between instances), so
+// the admin dashboard showed phantom grey — DB-backed is correct everywhere.
+model StoreHealth {
+  store        String   @id
+  status       String   @default("unknown")
+  errorMessage String?
+  lastRun      DateTime @default(now())
+
+  @@map("store_health")
+}
+
 model Invite {
   id                String    @id @default(cuid())
   tokenHash         String    @unique

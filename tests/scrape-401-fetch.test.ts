@@ -16,14 +16,14 @@ const suggestFixture = {
 const c21Detail = {
   title: 'Sol Ring (C21)',
   variants: [
-    { title: 'NM', price: 300, inventory_quantity: 1, available: true },
-    { title: 'SP', price: 270, inventory_quantity: 0, available: false },
+    { id: 11, title: 'NM', price: 300, inventory_quantity: 1, available: true },
+    { id: 12, title: 'SP', price: 270, inventory_quantity: 0, available: false },
   ],
 };
 
 const ltcDetail = {
   title: 'Sol Ring (LTC)',
-  variants: [{ title: 'MP', price: 225, inventory_quantity: 4, available: true }],
+  variants: [{ id: 21, title: 'MP', price: 225, inventory_quantity: 4, available: true }],
 };
 
 function mockFetch(routes: Record<string, { status: number; body: unknown } | Error>) {
@@ -53,7 +53,7 @@ describe('scrape401 (fetch-based)', () => {
         inventory: ['In Stock (1)'],
         condition: 'NM',
         image: 'https://img/c21.png',
-        link: 'https://store.401games.ca/products/sol-ring-c21',
+        link: 'https://store.401games.ca/products/sol-ring-c21?variant=11',
         store: '401 Games',
       },
       {
@@ -62,10 +62,21 @@ describe('scrape401 (fetch-based)', () => {
         inventory: ['In Stock (4)'],
         condition: 'MP',
         image: 'https://img/ltc.png',
-        link: 'https://store.401games.ca/products/sol-ring-ltc',
+        link: 'https://store.401games.ca/products/sol-ring-ltc?variant=21',
         store: '401 Games',
       },
     ]);
+  });
+
+  it('falls back to the plain product link when a variant has no id', async () => {
+    const fetcher = mockFetch({
+      'suggest.json': { status: 200, body: suggestFixture },
+      'sol-ring-c21.js': { status: 200, body: { variants: [{ title: 'NM', price: 300, inventory_quantity: 1 }] } },
+      'sol-ring-ltc.js': { status: 200, body: { variants: [] } },
+    });
+    const products = await scrape401({ card: 'Sol Ring', fetcher });
+    expect(products).toHaveLength(1);
+    expect(products[0].link).toBe('https://store.401games.ca/products/sol-ring-c21');
   });
 
   it('returns [] on empty results and blank queries without fetching details', async () => {

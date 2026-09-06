@@ -25,6 +25,7 @@ interface SuggestProduct {
 }
 
 interface ProductVariant {
+  id?: number;
   title?: string;
   price?: number;
   inventory_quantity?: number;
@@ -111,7 +112,12 @@ export async function scrape401({
     }
     if (!detail.data) return [];
     const image = typeof match.image === "string" ? match.image : "";
-    const link = `${BASE}/products/${encodeURIComponent(handle)}`;
+    // Deep-link the exact condition variant: NM/SP/MP rows of one printing
+    // would otherwise share a link (duplicate React keys client-side).
+    const linkFor = (variantId: number | undefined) =>
+      variantId !== undefined
+        ? `${BASE}/products/${encodeURIComponent(handle)}?variant=${variantId}`
+        : `${BASE}/products/${encodeURIComponent(handle)}`;
     const rows: Product[] = [];
     for (const v of productVariants(detail.data)) {
       const qty = typeof v.inventory_quantity === "number" ? v.inventory_quantity : 0;
@@ -124,7 +130,7 @@ export async function scrape401({
         inventory: qty > 0 ? [`In Stock (${qty})`] : ["In Stock"],
         condition: v.title?.trim() || "N/A",
         image,
-        link,
+        link: linkFor(typeof v.id === "number" ? v.id : undefined),
         store: STORE,
       });
     }
