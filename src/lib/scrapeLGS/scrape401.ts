@@ -98,24 +98,27 @@ export async function scrape401({
   }).slice(0, DETAIL_CAP);
 
   const products: Product[] = [];
-  await mapPool(matches, DETAIL_CONCURRENCY, async (match) => {
+  // Return per-product arrays (flatMapped below) so result order follows
+  // suggest order instead of detail-fetch completion order.
+  const perProduct = await mapPool(matches, DETAIL_CONCURRENCY, async (match) => {
     const handle = match.handle!.trim();
     let detail: { status: number; data: unknown };
     try {
-      detail = await getJson(fetcher, `${BASE}/products/${handle}.js`);
+      detail = await getJson(fetcher, `${BASE}/products/${encodeURIComponent(handle)}.js`);
     } catch (error) {
       console.error(`401 Games detail fetch failed for ${handle}:`, error);
-      return;
+      return [];
     }
-    if (!detail.data) return;
+    if (!detail.data) return [];
     const image = typeof match.image === "string" ? match.image : "";
-    const link = `${BASE}/products/${handle}`;
+    const link = `${BASE}/products/${encodeURIComponent(handle)}`;
+    const rows: Product[] = [];
     for (const v of productVariants(detail.data)) {
       const qty = typeof v.inventory_quantity === "number" ? v.inventory_quantity : 0;
       const inStock = qty > 0 || v.available === true;
       if (!inStock) continue;
       const cents = typeof v.price === "number" ? v.price : 0;
-      products.push({
+      rows.push({
         title: match.title!.trim(),
         price: `$${(cents / 100).toFixed(2)}`,
         inventory: qty > 0 ? [`In Stock (${qty})`] : ["In Stock"],
@@ -125,7 +128,8 @@ export async function scrape401({
         store: STORE,
       });
     }
+    return rows;
   });
 
-  return products;
+  return perProduct.flat();
 }
