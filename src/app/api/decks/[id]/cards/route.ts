@@ -5,6 +5,7 @@ import { getSession } from '@/lib/session';
 import { checkRateLimit, routeKey } from '@/lib/rateLimit';
 import { buildLibraryNameIndex, findLibraryName, normalizeCardName, isBasicLand } from '@/lib/parseMoxfield';
 import { boardSchema, type Board } from '@/lib/deckImport';
+import { enrichDeckCards } from '@/lib/deckEnrich';
 
 const addSchema = z.object({
   cardName: z.string().trim().min(1).max(200),
@@ -140,6 +141,16 @@ export async function PUT(
       where: { deckId: id },
       orderBy: { cardName: 'asc' },
     });
+
+    // Best-effort mana curve data for newly added rows — never fails the update.
+    if (canonicalAdds.length > 0) {
+      try {
+        await enrichDeckCards(id);
+      } catch (error) {
+        console.error('Post-update enrich failed:', error);
+      }
+    }
+
     return NextResponse.json({
       cards: cards.map((c) => ({
         cardName: c.cardName,
