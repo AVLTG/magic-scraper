@@ -243,6 +243,7 @@ manual application — `prisma migrate deploy` is incompatible with the libsql a
 
 ```bash
 turso db shell <your-db-name> < prisma/migrations-manual/2026-09-05-decks-format-commander-board.sql
+turso db shell <your-db-name> < prisma/migrations-manual/2026-09-06-store-health.sql
 ```
 
 That file adds `decks.format`, `decks.commander`, and `deck_cards.board`

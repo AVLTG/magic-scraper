@@ -29,24 +29,42 @@ export async function scrapeAllSites(
       "401 Games",
     ];
 
+    // Health is DB-backed (shared across serverless instances) — await all
+    // writes before returning so the admin dashboard never misses a run.
+    const healthWrites: Promise<unknown>[] = [];
     results.forEach((result, i) => {
       if (result.status === "fulfilled") {
         products.push(...result.value);
-        setStoreHealth(storeNames[i], {
-          status: "success",
-          lastRun: new Date().toISOString(),
-          error: null,
-        });
+        healthWrites.push(
+          setStoreHealth(storeNames[i], {
+            status: "success",
+            lastRun: new Date().toISOString(),
+            error: null,
+          })
+        );
       } else {
         console.error(`${storeNames[i]} failed:`, result.reason);
         failedStores.push(storeNames[i]);
-        setStoreHealth(storeNames[i], {
-          status: "failure",
-          lastRun: new Date().toISOString(),
-          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-        });
+        healthWrites.push(
+          setStoreHealth(storeNames[i], {
+            status: "failure",
+            lastRun: new Date().toISOString(),
+            error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          })
+        );
       }
     });
+    // Health is DB-backed (shared across serverless instances) — best-effort:
+    // a failed observability write must never 500 an otherwise good search.
+    const healthResults = await Promise.allSettled(healthWrites);
+    for (let i = 0; i < healthResults.length; i++) {
+      if (healthResults[i].status === "rejected") {
+        console.error(
+          `Health write failed for ${storeNames[i]}:`,
+          (healthResults[i] as PromiseRejectedResult).reason
+        );
+      }
+    }
 
     return { products, failedStores };
   } finally {

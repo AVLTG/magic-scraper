@@ -6,5 +6,5 @@ export async function GET() {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
-  return NextResponse.json(getAllStoreHealth());
+  return NextResponse.json(await getAllStoreHealth());
 }
