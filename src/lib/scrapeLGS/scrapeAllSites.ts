@@ -3,6 +3,7 @@ import { launchBrowser } from "./browser";
 import { scrapeETB } from "./scrapeETB";
 import { scrapeDCC } from "./scrapeDCC";
 import { scrapeFTF } from "./scrapeFTF";
+import { scrape401 } from "./scrape401";
 import type { Product } from "@/types/product";
 import { setStoreHealth } from "@/lib/scraperHealthCache";
 
@@ -15,6 +16,8 @@ export async function scrapeAllSites(
       scrapeETB({ card, browser }),
       scrapeDCC({ card, browser }),
       scrapeFTF({ card, browser }),
+      // Fetch-based (no browser): Shopify suggest + product JSON, zero proxy cost
+      scrape401({ card }),
     ]);
 
     const products: Product[] = [];
@@ -23,6 +26,7 @@ export async function scrapeAllSites(
       "Enter The Battlefield",
       "Dungeon Comics and Cards",
       "Face to Face Games",
+      "401 Games",
     ];
 
     results.forEach((result, i) => {

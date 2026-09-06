@@ -6,7 +6,8 @@ export interface StoreHealth {
 
 const cache = new Map<string, StoreHealth>();
 
-// Initialize 401 Games as disabled
+// 401 Games reports like every other store once scraped (fetch-based since
+// the Shopify rewrite — no longer disabled)
 cache.set("401 Games", { status: "unknown", lastRun: null, error: null });
 
 export function getStoreHealth(storeName: string): StoreHealth {

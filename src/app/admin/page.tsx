@@ -26,7 +26,8 @@ function relativeTime(date: Date | string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-const DISABLED_STORES = new Set(["401 Games"]);
+// No disabled stores: 401 Games was re-enabled with the fetch-based rewrite
+const DISABLED_STORES = new Set<string>([]);
 
 export default function AdminPage() {
   // Existing state for Update All Collections
